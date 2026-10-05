@@ -88,11 +88,39 @@ function attempt(engineName, src, live, mySession) {
 
     if (engineName === 'hls') {
       if (window.Hls?.isSupported()) {
-        const hls = new window.Hls({ enableWorker: true, lowLatencyMode: live, backBufferLength: 30 });
+        const hls = new window.Hls({
+          enableWorker: true,
+          // Sin modo baja latencia: en canales IPTV causa cortes y recargas constantes.
+          lowLatencyMode: false,
+          backBufferLength: 30,
+          liveSyncDurationCount: 4,
+          manifestLoadingMaxRetry: 6,
+          levelLoadingMaxRetry: 6,
+          fragLoadingMaxRetry: 8,
+          manifestLoadingTimeOut: 20000,
+          fragLoadingTimeOut: 30000,
+        });
         current.engine = hls;
+        let networkRecoveries = 0;
+        let mediaRecoveries = 0;
         hls.on(window.Hls.Events.MANIFEST_PARSED, play);
+        hls.on(window.Hls.Events.FRAG_BUFFERED, () => {
+          networkRecoveries = 0;
+        });
         hls.on(window.Hls.Events.ERROR, (_e, data) => {
           if (!data.fatal) return;
+          // Primero se intenta recuperar sin cortar la reproducción.
+          if (data.type === window.Hls.ErrorTypes.NETWORK_ERROR && networkRecoveries < 3 && data.response?.code !== 410) {
+            networkRecoveries += 1;
+            if (settled) setStatus(`Reconectando… (${networkRecoveries}/3)`);
+            setTimeout(() => current?.engine === hls && hls.startLoad(), 1000 * networkRecoveries);
+            return;
+          }
+          if (data.type === window.Hls.ErrorTypes.MEDIA_ERROR && mediaRecoveries < 2) {
+            mediaRecoveries += 1;
+            hls.recoverMediaError();
+            return;
+          }
           if (settled && mySession === session) handleMidStreamFailure();
           else done(false, describeHlsError(data));
         });
@@ -152,11 +180,12 @@ function describeHlsError(data) {
 let midStreamRetries = 0;
 /** Si una señal en vivo se corta después de haber arrancado, se reconecta una vez. */
 async function handleMidStreamFailure() {
-  if (!current || midStreamRetries >= 1) {
+  if (!current || midStreamRetries >= 2) {
     setStatus('Se perdió la señal. Cierra y vuelve a abrir el canal.', true);
     return;
   }
   midStreamRetries += 1;
+  current.started = false;
   setStatus('Reconectando…');
   start(current.item, { keepRetries: true });
 }
@@ -184,7 +213,10 @@ async function start(item, { keepRetries = false } = {}) {
     if (mySession !== session) return;
     try {
       await attempt(engine, playback.src, playback.live !== false, mySession);
-      if (mySession === session) els.overlay.hidden = true;
+      if (mySession === session) {
+        els.overlay.hidden = true;
+        current.started = true;
+      }
       return;
     } catch (err) {
       lastError = err.message;
@@ -230,7 +262,31 @@ export function closePlayer() {
   returnFocus?.focus?.();
 }
 
+/** Muestra "Cargando…" si el video se queda esperando datos y lo oculta al reanudar. */
+function watchBuffering() {
+  const video = els.video;
+  let stallTimer = null;
+  video.addEventListener('waiting', () => {
+    // Solo después de haber arrancado: durante el arranque manda el tiempo límite de cada intento.
+    if (!current?.started || els.overlay.classList.contains('is-error')) return;
+    clearTimeout(stallTimer);
+    stallTimer = setTimeout(() => {
+      if (current && video.readyState < 3) setStatus('Cargando señal…');
+    }, 1500);
+    // Si en 25 s no se recupera, se reconecta pidiendo un enlace nuevo.
+    const waitingSession = session;
+    setTimeout(() => {
+      if (current && waitingSession === session && video.readyState < 3 && !video.paused) handleMidStreamFailure();
+    }, 25000);
+  });
+  video.addEventListener('playing', () => {
+    clearTimeout(stallTimer);
+    if (!els.overlay.classList.contains('is-error')) els.overlay.hidden = true;
+  });
+}
+
 export function initPlayer() {
+  watchBuffering();
   document.getElementById('player-close').addEventListener('click', closePlayer);
   els.root.addEventListener('click', (e) => {
     if (e.target === els.root) closePlayer();

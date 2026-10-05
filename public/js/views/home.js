@@ -1,7 +1,21 @@
 import { h, mount } from '../core/dom.js';
 import { api } from '../core/api.js';
 import { store } from '../core/store.js';
-import { emptyState, mediaCard, section } from '../ui/cards.js';
+import { emptyState, loading, mediaCard, section } from '../ui/cards.js';
+
+/** Fila que se llena sola con una lista pública; si falla, desaparece. */
+function publicRow(title, kind, code) {
+  const row = h('div', { class: 'row' }, loading());
+  const el = section(title, row, { href: `#/tv?${kind}=${code}`, text: 'Ver todos' });
+  api
+    .publicChannels(kind, code)
+    .then(({ items }) => {
+      if (!items.length) return el.remove();
+      row.replaceChildren(...items.slice(0, 24).map((c) => mediaCard(c)));
+    })
+    .catch(() => el.remove());
+  return el;
+}
 
 export async function renderHome(view) {
   const [catalog, favorites, playlists] = await Promise.all([
@@ -39,10 +53,12 @@ export async function renderHome(view) {
             { href: '#/favoritos', text: 'Ver todos' },
           )
         : null,
+      publicRow('Colombia en vivo', 'pais', 'co'),
+      publicRow('Deportes en vivo', 'cat', 'sports'),
       section(
-        'Canales gratuitos',
+        'Canales MOGA',
         h('div', { class: 'row' }, catalog.channels.map((c) => mediaCard(c))),
-        { href: '#/tv', text: 'Más canales' },
+        { href: '#/tv?moga=1', text: 'Ver todos' },
       ),
       section(
         'Películas libres',

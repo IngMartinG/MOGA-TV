@@ -4,7 +4,14 @@ import { assertPublicLiteralHost, createSafeLookup, parseExternalUrl } from '../
 import { AppError } from '../utils/errors.js';
 
 const MAX_REDIRECTS = 5;
-const UPSTREAM_USER_AGENT = 'VLC/3.0.21 LibVLC/3.0.21';
+
+/** User-agents que aceptan los paneles IPTV más comunes, en orden de preferencia. */
+export const USER_AGENTS = Object.freeze({
+  vlc: 'VLC/3.0.21 LibVLC/3.0.21',
+  browser: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36',
+  smarters: 'IPTVSmartersPlayer',
+});
+const UPSTREAM_USER_AGENT = USER_AGENTS.vlc;
 
 /**
  * Cliente HTTP saliente con protección SSRF en cada salto de redirección,
@@ -34,7 +41,11 @@ export function createHttpClient({ allowPrivateNetworks = false, timeoutMs = 200
         resolve,
       );
       req.on('timeout', () => req.destroy(new AppError(504, 'La fuente tardó demasiado en responder.')));
-      req.on('error', reject);
+      req.on('error', (err) => {
+        // Un socket keep-alive que el servidor ya cerró: se puede reintentar sin riesgo.
+        err.reusedSocket = req.reusedSocket;
+        reject(err);
+      });
       req.end();
     });
   }
@@ -42,11 +53,17 @@ export function createHttpClient({ allowPrivateNetworks = false, timeoutMs = 200
   /** Devuelve la respuesta (stream) final tras seguir redirecciones validadas. */
   async function request(rawUrl, options = {}) {
     let url = parseExternalUrl(rawUrl);
+    let retried = false;
     for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
       let res;
       try {
         res = await once(url, options);
       } catch (err) {
+        if (!retried && err?.reusedSocket && err.code === 'ECONNRESET') {
+          retried = true;
+          hop -= 1;
+          continue;
+        }
         throw toUpstreamError(err);
       }
       const location = res.headers.location;
@@ -66,7 +83,9 @@ export function createHttpClient({ allowPrivateNetworks = false, timeoutMs = 200
     const res = await request(rawUrl, options);
     if (res.statusCode < 200 || res.statusCode >= 300) {
       res.resume();
-      throw new AppError(502, `La fuente respondió con error HTTP ${res.statusCode}.`);
+      const err = new AppError(502, `La fuente respondió con error HTTP ${res.statusCode}.`);
+      err.upstreamStatus = res.statusCode;
+      throw err;
     }
     const declared = Number(res.headers['content-length'] || 0);
     if (declared > maxBytes) {
@@ -104,6 +123,13 @@ export function createHttpClient({ allowPrivateNetworks = false, timeoutMs = 200
 }
 
 function toUpstreamError(err) {
+  const mapped = mapUpstreamError(err);
+  // Errores de conexión: cambiar de user-agent o de ruta no los arregla.
+  if (!(err instanceof AppError) || err.status === 504) mapped.network = true;
+  return mapped;
+}
+
+function mapUpstreamError(err) {
   if (err instanceof AppError) return err;
   if (err?.code === 'EBLOCKEDHOST') return new AppError(400, 'Esa dirección no está permitida (red privada).');
   if (err?.name === 'AbortError') return new AppError(499, 'Solicitud cancelada.');

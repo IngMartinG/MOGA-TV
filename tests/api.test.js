@@ -160,6 +160,33 @@ describe('listas, reproducción y proxy', () => {
     assert.equal(JSON.stringify(ok.data).includes('clave'), false, 'no devuelve la contraseña');
   });
 
+  test('Xtream sin player_api: usa get.php y el user-agent que acepta el panel', async () => {
+    const res = await c.post('/api/playlists', {
+      kind: 'xtream',
+      name: 'Estricto',
+      server: `${iptv.base}/strict`,
+      username: 'u',
+      password: 'clave',
+    });
+    assert.equal(res.status, 201, JSON.stringify(res.data));
+    assert.equal(res.data.playlist.live_count, 1);
+    const { data: list } = await c.get(`/api/playlists/${res.data.playlist.id}/channels?type=live`);
+    const play = await c.get(`/api/play/ch:${list.items[0].id}`);
+    const manifest = await c.get(play.data.src);
+    assert.equal(manifest.status, 200, 'el proxy debe reutilizar el user-agent de navegador');
+    const segment = manifest.data.split('\n').find((l) => l.startsWith('/api/stream/'));
+    const seg = await c.get(segment);
+    assert.equal(seg.data, 'STRICT-TS', 'los segmentos heredan el user-agent');
+  });
+
+  test('Xtream que falla por todas las vías explica cada intento', async () => {
+    const res = await c.post('/api/playlists', { kind: 'xtream', server: `${iptv.base}/strict`, username: 'u', password: 'mala' });
+    assert.equal(res.status, 502);
+    assert.match(res.data.error.message, /player_api \(VLC\): HTTP 400/);
+    assert.match(res.data.error.message, /get\.php/);
+    assert.equal(res.data.error.message.includes('mala'), false, 'no muestra la contraseña');
+  });
+
   test('favoritos usan datos del servidor', async () => {
     assert.equal((await c.put('/api/favorites/free:france24-es')).status, 204);
     assert.equal((await c.put('/api/favorites/free:no-existe')).status, 404);

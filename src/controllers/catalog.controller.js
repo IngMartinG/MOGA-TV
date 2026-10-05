@@ -1,4 +1,4 @@
-import { countrySchema, itemKeySchema } from '../validators/schemas.js';
+import { itemKeySchema, publicListSchema } from '../validators/schemas.js';
 
 export function createCatalogController({ catalogService, playlistService, streamService }) {
   return {
@@ -7,12 +7,13 @@ export function createCatalogController({ catalogService, playlistService, strea
         channels: catalogService.freeChannels(),
         movies: catalogService.freeMovies(),
         countries: catalogService.countries(),
+        categories: catalogService.categories(),
       });
     },
 
     async publicChannels(req, res) {
-      const code = countrySchema.parse(req.params.country);
-      res.json({ items: await catalogService.publicChannels(code) });
+      const { kind, code } = publicListSchema.parse(req.params);
+      res.json({ items: await catalogService.publicChannels(kind, code) });
     },
 
     /** Entrega la URL tokenizada para reproducir cualquier contenido por su clave. */

@@ -109,7 +109,10 @@ export const FREE_MOVIES = [
   },
 ];
 
-/** Países con lista pública en iptv-org (https://github.com/iptv-org/iptv). */
+/**
+ * Listas públicas de iptv-org (https://github.com/iptv-org/iptv): canales de acceso
+ * libre publicados por sus propios emisores, organizados por país y por categoría.
+ */
 export const PUBLIC_COUNTRIES = [
   { code: 'co', name: 'Colombia' },
   { code: 'mx', name: 'México' },
@@ -118,9 +121,38 @@ export const PUBLIC_COUNTRIES = [
   { code: 'pe', name: 'Perú' },
   { code: 'ec', name: 'Ecuador' },
   { code: 've', name: 'Venezuela' },
+  { code: 'bo', name: 'Bolivia' },
+  { code: 'py', name: 'Paraguay' },
+  { code: 'uy', name: 'Uruguay' },
+  { code: 'cr', name: 'Costa Rica' },
+  { code: 'pa', name: 'Panamá' },
+  { code: 'do', name: 'Rep. Dominicana' },
+  { code: 'gt', name: 'Guatemala' },
+  { code: 'hn', name: 'Honduras' },
+  { code: 'sv', name: 'El Salvador' },
+  { code: 'pr', name: 'Puerto Rico' },
   { code: 'es', name: 'España' },
   { code: 'us', name: 'Estados Unidos' },
   { code: 'br', name: 'Brasil' },
+  { code: 'it', name: 'Italia' },
+  { code: 'fr', name: 'Francia' },
+  { code: 'gb', name: 'Reino Unido' },
 ];
 
-export const PUBLIC_LIST_URL = (code) => `https://iptv-org.github.io/iptv/countries/${code}.m3u`;
+export const PUBLIC_CATEGORIES = [
+  { code: 'sports', name: 'Deportes' },
+  { code: 'news', name: 'Noticias' },
+  { code: 'movies', name: 'Películas' },
+  { code: 'series', name: 'Series' },
+  { code: 'kids', name: 'Infantil' },
+  { code: 'animation', name: 'Animación' },
+  { code: 'music', name: 'Música' },
+  { code: 'entertainment', name: 'Entretenimiento' },
+  { code: 'documentary', name: 'Documentales' },
+  { code: 'comedy', name: 'Comedia' },
+];
+
+export const PUBLIC_SOURCES = {
+  pais: { list: PUBLIC_COUNTRIES, url: (code) => `https://iptv-org.github.io/iptv/countries/${code}.m3u` },
+  cat: { list: PUBLIC_CATEGORIES, url: (code) => `https://iptv-org.github.io/iptv/categories/${code}.m3u` },
+};

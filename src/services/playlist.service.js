@@ -1,4 +1,6 @@
-import { cleanText, normalizeSearch, parseM3U, safeImageUrl } from '../utils/m3u-parser.js';
+import { normalizeSearch, parseM3U } from '../utils/m3u-parser.js';
+import { USER_AGENTS } from '../infrastructure/http-client.js';
+import { loadXtreamAccount } from './xtream.client.js';
 import { parseExternalUrl } from '../security/ssrf.js';
 import { AppError, notFound } from '../utils/errors.js';
 
@@ -22,71 +24,32 @@ export function createPlaylistService({ playlists, httpClient, sealer, config, p
     return `M3U · ${new URL(source.url).host}`;
   }
 
-  async function loadXtream({ server, username, password }) {
-    const api = `${server}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
-    const info = await httpClient.getJson(api, { maxBytes: 1024 * 1024 });
-    if (!info?.user_info || Number(info.user_info.auth) !== 1) {
-      throw new AppError(400, 'El servidor Xtream rechazó el usuario o la contraseña.');
+  async function loadM3U({ url, userAgent }) {
+    const failures = [];
+    for (const ua of [...new Set([userAgent, USER_AGENTS.vlc, USER_AGENTS.browser].filter(Boolean))]) {
+      try {
+        const { text, finalUrl } = await httpClient.getText(url, { maxBytes: config.maxPlaylistBytes, headers: { 'user-agent': ua } });
+        if (!/#EXTM3U|#EXTINF/i.test(text.slice(0, 4096))) {
+          throw new AppError(400, 'La URL no devolvió una lista M3U válida.');
+        }
+        return { entries: parseM3U(text, finalUrl), userAgent: ua };
+      } catch (err) {
+        if (!err.upstreamStatus) throw err;
+        failures.push(`HTTP ${err.upstreamStatus}`);
+      }
     }
-    if (info.user_info.status && String(info.user_info.status).toLowerCase() !== 'active') {
-      throw new AppError(400, `La cuenta Xtream no está activa (estado: ${cleanText(info.user_info.status, 40)}).`);
-    }
-    const action = (name) => `${api}&action=${name}`;
-    const big = { maxBytes: config.maxPlaylistBytes };
-    const [liveCats, live, vodCats, vod] = await Promise.all([
-      httpClient.getJson(action('get_live_categories'), big).catch(() => []),
-      httpClient.getJson(action('get_live_streams'), big),
-      httpClient.getJson(action('get_vod_categories'), big).catch(() => []),
-      httpClient.getJson(action('get_vod_streams'), big).catch(() => []),
-    ]);
-    const catName = (list) => {
-      const map = new Map();
-      for (const c of Array.isArray(list) ? list : []) map.set(String(c.category_id), cleanText(c.category_name, 120));
-      return (id) => map.get(String(id)) || 'Sin categoría';
-    };
-    const liveCat = catName(liveCats);
-    const vodCat = catName(vodCats);
-    const user = encodeURIComponent(username);
-    const pass = encodeURIComponent(password);
-    const entries = [];
-    for (const item of Array.isArray(live) ? live : []) {
-      const id = Number.parseInt(item.stream_id, 10);
-      if (!Number.isFinite(id)) continue;
-      entries.push({
-        name: cleanText(item.name) || `Canal ${id}`,
-        logo: safeImageUrl(item.stream_icon),
-        group: liveCat(item.category_id),
-        mediaType: 'live',
-        url: `${server}/live/${user}/${pass}/${id}.m3u8`,
-      });
-    }
-    for (const item of Array.isArray(vod) ? vod : []) {
-      const id = Number.parseInt(item.stream_id, 10);
-      if (!Number.isFinite(id)) continue;
-      const ext = /^[a-z0-9]{2,5}$/i.test(item.container_extension || '') ? item.container_extension : 'mp4';
-      entries.push({
-        name: cleanText(item.name) || `Película ${id}`,
-        logo: safeImageUrl(item.stream_icon),
-        group: vodCat(item.category_id),
-        mediaType: 'movie',
-        url: `${server}/movie/${user}/${pass}/${id}.${ext}`,
-      });
-    }
-    return entries;
+    throw new AppError(502, `El servidor de la lista respondió con error (${failures.join(', ')}).`);
   }
 
-  async function loadM3U({ url }) {
-    const { text, finalUrl } = await httpClient.getText(url, { maxBytes: config.maxPlaylistBytes });
-    if (!/#EXTM3U|#EXTINF/i.test(text.slice(0, 4096))) {
-      throw new AppError(400, 'La URL no devolvió una lista M3U válida.');
-    }
-    return parseM3U(text, finalUrl);
-  }
-
+  /** Descarga la lista y recuerda el user-agent que aceptó el servidor. */
   async function fetchEntries(source) {
-    const entries = source.kind === 'xtream' ? await loadXtream(source) : await loadM3U(source);
-    if (!entries.length) throw new AppError(400, 'La lista respondió pero no trae canales reproducibles.');
-    return entries;
+    const result =
+      source.kind === 'xtream'
+        ? await loadXtreamAccount(httpClient, source, { maxBytes: config.maxPlaylistBytes })
+        : await loadM3U(source);
+    if (!result.entries.length) throw new AppError(400, 'La lista respondió pero no trae canales reproducibles.');
+    source.userAgent = result.userAgent;
+    return result.entries;
   }
 
   function storeEntries(playlistId, entries) {
@@ -137,6 +100,7 @@ export function createPlaylistService({ playlists, httpClient, sealer, config, p
     if (!source) throw new AppError(500, 'No se pudieron leer los datos de la lista. Vuelve a agregarla.');
     try {
       storeEntries(playlistId, await fetchEntries(source));
+      playlists.updateSource(playlistId, sealer.seal(source));
     } catch (err) {
       playlists.setError(playlistId, err.expose ? err.message : 'Error al actualizar.');
       throw err;
@@ -194,8 +158,9 @@ export function createPlaylistService({ playlists, httpClient, sealer, config, p
       if (!channel) throw notFound('Canal no encontrado.');
       const url = sealer.open(channel.url_enc);
       if (!url) throw new AppError(500, 'No se pudo leer el canal. Actualiza la lista.');
+      const source = sealer.open(channel.source_enc);
       return {
-        ...playbackFor(userId, url),
+        ...playbackFor(userId, url, { userAgent: source?.userAgent }),
         title: channel.name,
         subtitle: channel.playlist_name,
         live: channel.media_type === 'live',

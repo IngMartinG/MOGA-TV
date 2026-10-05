@@ -74,6 +74,9 @@ export const channelQuerySchema = z.object({
 export const itemKeySchema = z
   .string()
   .max(80)
-  .regex(/^(free:[a-z0-9-]+|movie:[a-z0-9-]+|public:[a-z]{2}:\d{1,5}|ch:\d{1,12})$/, 'Contenido no válido.');
+  .regex(/^(free:[a-z0-9-]+|movie:[a-z0-9-]+|public:(pais|cat):[a-z]{2,20}:\d{1,5}|ch:\d{1,12})$/, 'Contenido no válido.');
 
-export const countrySchema = z.string().regex(/^[a-z]{2}$/, 'País no válido.');
+export const publicListSchema = z.object({
+  kind: z.enum(['pais', 'cat'], { error: 'Tipo de lista no válido.' }),
+  code: z.string().regex(/^[a-z]{2,20}$/, 'Lista no válida.'),
+});

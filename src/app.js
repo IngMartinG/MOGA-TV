@@ -43,7 +43,7 @@ export function createApp(config, { logger = createLogger() } = {}) {
 
   const authService = createAuthService({ users: repos.users, sessions: repos.sessions, config });
   const catalogService = createCatalogService({ httpClient, logger });
-  const streamService = createStreamService({ httpClient, sealer, config });
+  const streamService = createStreamService({ httpClient, sealer, config, logger });
   const playlistService = createPlaylistService({
     playlists: repos.playlists,
     httpClient,
