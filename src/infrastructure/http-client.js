@@ -24,7 +24,7 @@ export function createHttpClient({ allowPrivateNetworks = false, timeoutMs = 200
     'https:': new https.Agent({ keepAlive: true, maxSockets: 64 }),
   };
 
-  function once(url, { method = 'GET', headers = {}, signal }) {
+  function once(url, { method = 'GET', headers = {}, signal, family }) {
     return new Promise((resolve, reject) => {
       assertPublicLiteralHost(url, { allowPrivateNetworks });
       const lib = url.protocol === 'https:' ? https : http;
@@ -34,6 +34,8 @@ export function createHttpClient({ allowPrivateNetworks = false, timeoutMs = 200
           method,
           agent: agents[url.protocol],
           lookup,
+          // family 4: reintento forzando IPv4 (equipos con IPv6 configurado pero sin salida).
+          ...(family ? { family, autoSelectFamily: false } : {}),
           headers: { 'user-agent': UPSTREAM_USER_AGENT, accept: '*/*', ...headers },
           timeout: timeoutMs,
           signal,
@@ -54,13 +56,19 @@ export function createHttpClient({ allowPrivateNetworks = false, timeoutMs = 200
   async function request(rawUrl, options = {}) {
     let url = parseExternalUrl(rawUrl);
     let retried = false;
+    let family = options.family;
     for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
       let res;
       try {
-        res = await once(url, options);
+        res = await once(url, { ...options, family });
       } catch (err) {
         if (!retried && err?.reusedSocket && err.code === 'ECONNRESET') {
           retried = true;
+          hop -= 1;
+          continue;
+        }
+        if (!family && isConnectionError(err)) {
+          family = 4;
           hop -= 1;
           continue;
         }
@@ -129,13 +137,27 @@ function toUpstreamError(err) {
   return mapped;
 }
 
-function mapUpstreamError(err) {
+/** Fallos de conexión (no respuestas HTTP): vale la pena reintentar por IPv4. */
+function isConnectionError(err) {
+  if (!err || err instanceof AppError || err.name === 'AbortError' || err.code === 'EBLOCKEDHOST') return false;
+  return typeof err.code === 'string';
+}
+
+/** Traduce errores de red a mensajes claros; el código técnico se incluye (no lleva datos privados). */
+export function mapUpstreamError(err) {
   if (err instanceof AppError) return err;
-  if (err?.code === 'EBLOCKEDHOST') return new AppError(400, 'Esa dirección no está permitida (red privada).');
+  const code = typeof err?.code === 'string' ? err.code : '';
+  const withCode = (text) => new AppError(502, `${text}${code ? ` (${code})` : ''}.`);
+  if (code === 'EBLOCKEDHOST') return new AppError(400, 'Esa dirección no está permitida (red privada).');
   if (err?.name === 'AbortError') return new AppError(499, 'Solicitud cancelada.');
-  if (['ENOTFOUND', 'EAI_AGAIN'].includes(err?.code)) return new AppError(502, 'No se encontró el servidor de la fuente.');
-  if (['ECONNREFUSED', 'ECONNRESET', 'EHOSTUNREACH', 'ETIMEDOUT'].includes(err?.code)) {
-    return new AppError(502, 'No se pudo conectar con la fuente (caída o bloqueada).');
+  if (['ENOTFOUND', 'EAI_AGAIN'].includes(code)) return withCode('No se encontró el servidor de la fuente');
+  if (['EAI_FAIL', 'ESERVFAIL', 'ENODATA'].includes(code)) return withCode('Fallo de DNS al buscar el servidor');
+  if (['ENETUNREACH', 'EADDRNOTAVAIL'].includes(code)) return withCode('Sin ruta de red hacia el servidor (revisa IPv6 o la conexión)');
+  if (['ECONNREFUSED', 'ECONNRESET', 'EHOSTUNREACH', 'ETIMEDOUT', 'EPIPE'].includes(code)) {
+    return withCode('No se pudo conectar con la fuente (caída o bloqueada)');
   }
-  return new AppError(502, 'Error al conectar con la fuente.');
+  if (/^(CERT_|UNABLE_TO_|SELF_SIGNED|DEPTH_ZERO|ERR_TLS_|ERR_SSL_)/.test(code) || code === 'EPROTO') {
+    return withCode('Certificado HTTPS no válido; puede ser el antivirus o un proxy revisando las conexiones');
+  }
+  return withCode('Error al conectar con la fuente');
 }

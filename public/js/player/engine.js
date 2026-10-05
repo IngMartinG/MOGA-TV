@@ -109,6 +109,10 @@ export class VideoSession {
         if (mySession === this.session) {
           this.overlay.hidden = true;
           this.started = true;
+          // Tras un minuto estable, se recuperan los reintentos para futuros cortes.
+          setTimeout(() => {
+            if (mySession === this.session) this.retries = 0;
+          }, 60000);
           report(item.key, true);
           this.onStarted(item);
         }
@@ -169,7 +173,12 @@ export class VideoSession {
             // Sin modo baja latencia: en canales IPTV causa cortes y recargas constantes.
             lowLatencyMode: false,
             backBufferLength: 30,
-            liveSyncDurationCount: 3,
+            // Colchón de video: los cortes breves de la fuente no detienen la imagen.
+            maxBufferLength: 30,
+            maxMaxBufferLength: 60,
+            liveSyncDurationCount: 4,
+            liveMaxLatencyDurationCount: 10,
+            fragLoadingRetryDelay: 500,
             startLevel: -1,
             capLevelToPlayerSize: true,
             manifestLoadingMaxRetry: 6,
@@ -182,14 +191,22 @@ export class VideoSession {
           let networkRecoveries = 0;
           let mediaRecoveries = 0;
           hls.on(window.Hls.Events.MANIFEST_PARSED, play);
+          let noticeTimer = null;
           hls.on(window.Hls.Events.FRAG_BUFFERED, () => {
             networkRecoveries = 0;
+            clearTimeout(noticeTimer);
           });
           hls.on(window.Hls.Events.ERROR, (_e, data) => {
             if (!data.fatal) return;
             if (data.type === window.Hls.ErrorTypes.NETWORK_ERROR && networkRecoveries < 3 && data.response?.code !== 410) {
               networkRecoveries += 1;
-              if (settled) self.setStatus(`Reconectando… (${networkRecoveries}/3)`);
+              // El aviso solo aparece si la recuperación tarda: los cortes de 1-2 s pasan sin avisar.
+              clearTimeout(noticeTimer);
+              if (settled) {
+                noticeTimer = setTimeout(() => {
+                  if (self.engine === hls && self.video.readyState < 3) self.setStatus('Reconectando…');
+                }, 3000);
+              }
               setTimeout(() => self.engine === hls && hls.startLoad(), 1000 * networkRecoveries);
               return;
             }
@@ -253,7 +270,7 @@ export class VideoSession {
       clearTimeout(stallTimer);
       stallTimer = setTimeout(() => {
         if (this.started && video.readyState < 3) this.setStatus('Cargando señal…');
-      }, 1500);
+      }, 3000);
       const waitingSession = this.session;
       setTimeout(() => {
         if (waitingSession === this.session && video.readyState < 3 && !video.paused) this.midStreamFailure();

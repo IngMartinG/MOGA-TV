@@ -4,7 +4,4 @@
 *.log
 .DS_Store
 Thumbs.db
-*.md
-*.txt
-*.sh
-*.json
+/.agents/
