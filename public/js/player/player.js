@@ -45,13 +45,17 @@ function setStatus(text, isError = false) {
 }
 
 function destroyEngine() {
-  if (!current?.engine) return;
-  try {
-    current.engine.destroy();
-  } catch {
-    /* ya destruido */
-  }
+  const engine = current?.engine;
+  if (!engine) return;
   current.engine = null;
+  // Se difiere: si se destruye dentro de un evento del propio motor, éste falla.
+  setTimeout(() => {
+    try {
+      engine.destroy();
+    } catch {
+      /* ya destruido */
+    }
+  }, 0);
 }
 
 function resetVideo() {
