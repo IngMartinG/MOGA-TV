@@ -65,9 +65,16 @@ Flujo de una petición: **ruta → controlador → servicio → repositorio → 
 
 - **API abierta de [iptv-org](https://github.com/iptv-org/api)**: miles de canales de acceso libre publicados por sus propios emisores, por país y por categoría. La app descarga el índice (canales, streams, logos, lista de bloqueo) cada 12 horas y lo guarda en `data/cache/` para arrancar rápido aunque la API no responda.
 - **Verificación automática**: el servidor prueba cada canal (lista HLS y primer segmento) con las cabeceras que exige (`Referer`, `User-Agent`) y guarda el resultado. En pantalla salen primero los **✓ Verificados**; los caídos se ocultan. Cada vez que alguien abre un canal, ese resultado también cuenta.
+- **Películas completas** desde la API de [Internet Archive](https://archive.org/developers): clásicos de dominio público (terror, western, comedia, cine negro, en español…), legales y gratuitos, con póster y sinopsis.
 - **Tus listas** (M3U o Xtream) en *Mis listas*.
 
 La primera vez que arranca tarda unos segundos en descargar el índice y empieza a verificar Colombia, Deportes y Noticias; en las demás listas, la verificación empieza al abrirlas y la pantalla se actualiza sola.
+
+## Cómo se usa (estilo Magma)
+
+- **Inicio**: mosaicos grandes para TV en vivo, Películas, Mis listas, Favoritos y Cuenta.
+- **TV en vivo**: grupos (países, categorías o los de tu lista) · canales numerados · vista previa que reproduce al instante. Doble clic o Enter: pantalla completa. Re Pág / Av Pág (o los botones): canal anterior/siguiente.
+- **Películas**: categorías a la izquierda, pósters a la derecha, ficha con sinopsis y botón *Ver película*.
 
 ## Seguridad
 

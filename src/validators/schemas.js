@@ -73,8 +73,8 @@ export const channelQuerySchema = z.object({
 
 export const itemKeySchema = z
   .string()
-  .max(80)
-  .regex(/^(free:[a-z0-9-]+|movie:[a-z0-9-]+|pub:[a-f0-9]{16}|ch:\d{1,12})$/, 'Contenido no válido.');
+  .max(120)
+  .regex(/^(free:[a-z0-9-]+|movie:[a-z0-9-]+|pub:[a-f0-9]{16}|ia:[A-Za-z0-9._-]{1,100}|ch:\d{1,12})$/, 'Contenido no válido.');
 
 export const publicQuerySchema = z.object({
   todos: z
@@ -89,3 +89,5 @@ export const publicListSchema = z.object({
   kind: z.enum(['pais', 'cat'], { error: 'Tipo de lista no válido.' }),
   code: z.string().regex(/^[a-z]{2,20}$/, 'Lista no válida.'),
 });
+
+export const movieCategorySchema = z.string().regex(/^[a-z]{2,20}$/, 'Categoría no válida.');

@@ -1,4 +1,4 @@
-import { itemKeySchema, playResultSchema, publicListSchema, publicQuerySchema } from '../validators/schemas.js';
+import { itemKeySchema, movieCategorySchema, playResultSchema, publicListSchema, publicQuerySchema } from '../validators/schemas.js';
 
 const REPORT_WINDOW_MS = 30 * 60 * 1000;
 
@@ -21,7 +21,13 @@ export function createCatalogController({ catalogService, playlistService, strea
         movies: catalogService.freeMovies(),
         countries: catalogService.countries(),
         categories: catalogService.categories(),
+        movieCategories: catalogService.movieCategories(),
       });
+    },
+
+    async movies(req, res) {
+      const code = movieCategorySchema.parse(req.params.code);
+      res.json({ items: await catalogService.movies(code) });
     },
 
     async publicChannels(req, res) {

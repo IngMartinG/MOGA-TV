@@ -34,6 +34,7 @@ export function createApiRouter({ controllers, streamService }) {
 
   api.get('/catalog', catalog.home);
   api.get('/catalog/public/:kind/:code', catalog.publicChannels);
+  api.get('/movies/archive/:code', catalog.movies);
   api.get('/play/:key', catalog.play);
   api.post('/play/:key/result', catalog.playResult);
 

@@ -1,6 +1,6 @@
 // Service worker: guarda solo la interfaz para abrir rápido e instalar la app.
 // Nunca guarda respuestas de la API ni video (datos privados del usuario).
-const CACHE = 'moga-shell-v1';
+const CACHE = 'moga-shell-v2';
 const SHELL = ['/', '/css/base.css', '/css/layout.css', '/css/components.css', '/assets/icon.svg', '/manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
