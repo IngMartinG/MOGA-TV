@@ -33,7 +33,7 @@ export function createApiRouter({ controllers, streamService }) {
   api.delete('/account', limitAuth, auth.deleteAccount);
 
   api.get('/catalog', catalog.home);
-  api.get('/catalog/public/:country', catalog.publicChannels);
+  api.get('/catalog/public/:kind/:code', catalog.publicChannels);
   api.get('/play/:key', catalog.play);
 
   const limitPlaylist = playlistLimiter();

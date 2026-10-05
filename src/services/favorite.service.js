@@ -1,4 +1,3 @@
-import { FREE_CHANNELS, FREE_MOVIES } from '../data/catalog.js';
 import { AppError } from '../utils/errors.js';
 
 const MAX_FAVORITES = 500;
@@ -9,22 +8,13 @@ const MAX_FAVORITES = 500;
  */
 export function createFavoriteService({ favorites, catalog, playlistService }) {
   async function describe(userId, key) {
-    const [kind, a] = key.split(':');
-    if (kind === 'ch') return playlistService.channelInfo(userId, Number(a));
-    if (kind === 'free') {
-      const item = FREE_CHANNELS.find((c) => c.id === a);
-      if (item) return { title: item.name, logo: null, subtitle: item.category };
+    if (key.startsWith('ch:')) return playlistService.channelInfo(userId, Number(key.slice(3)));
+    try {
+      const { title, logo, subtitle } = await catalog.resolveKey(key);
+      return { title, logo, subtitle };
+    } catch {
+      throw new AppError(404, 'No se encontró ese contenido.');
     }
-    if (kind === 'movie') {
-      const item = FREE_MOVIES.find((c) => c.id === a);
-      if (item) return { title: item.name, logo: null, subtitle: `${item.category} · ${item.year}` };
-    }
-    if (kind === 'public') {
-      const list = await catalog.publicChannels(a);
-      const item = list.find((c) => c.key === key);
-      if (item) return { title: item.name, logo: item.logo, subtitle: item.category };
-    }
-    throw new AppError(404, 'No se encontró ese contenido.');
   }
 
   return {

@@ -15,6 +15,7 @@ export function createPlaylistRepository(db) {
     rename: db.prepare('UPDATE playlists SET name = ? WHERE id = ? AND user_id = ?'),
     remove: db.prepare('DELETE FROM playlists WHERE id = ? AND user_id = ?'),
     setError: db.prepare('UPDATE playlists SET last_error = ? WHERE id = ?'),
+    updateSource: db.prepare('UPDATE playlists SET source_enc = ? WHERE id = ?'),
     setCounts: db.prepare(
       'UPDATE playlists SET live_count = ?, movie_count = ?, series_count = ?, last_error = NULL, refreshed_at = ? WHERE id = ?',
     ),
@@ -28,7 +29,7 @@ export function createPlaylistRepository(db) {
        WHERE playlist_id = ? AND media_type = ? GROUP BY group_title ORDER BY MIN(position)`,
     ),
     channelForUser: db.prepare(
-      `SELECT c.id, c.playlist_id, c.name, c.logo, c.group_title, c.media_type, c.url_enc, p.name AS playlist_name
+      `SELECT c.id, c.playlist_id, c.name, c.logo, c.group_title, c.media_type, c.url_enc, p.name AS playlist_name, p.source_enc
        FROM channels c JOIN playlists p ON p.id = c.playlist_id
        WHERE c.id = ? AND p.user_id = ?`,
     ),
@@ -46,6 +47,7 @@ export function createPlaylistRepository(db) {
     rename: (id, userId, name) => stmts.rename.run(name, id, userId).changes > 0,
     remove: (id, userId) => stmts.remove.run(id, userId).changes > 0,
     setError: (id, message) => stmts.setError.run(message, id),
+    updateSource: (id, sourceEnc) => stmts.updateSource.run(sourceEnc, id),
 
     /** Reemplaza todos los canales de una lista de forma atómica. */
     replaceChannels(playlistId, channels) {

@@ -15,15 +15,15 @@ const FORWARDED_HEADERS = ['content-length', 'content-range', 'accept-ranges', '
  * usuario; nunca la URL real (que puede llevar usuario y contraseña de la lista).
  * No es un proxy abierto: solo sirve URLs que el propio servidor firmó.
  */
-export function createStreamService({ httpClient, sealer, config }) {
+export function createStreamService({ httpClient, sealer, config, logger }) {
   const ttlMs = config.streamTokenTtlMinutes * 60 * 1000;
 
-  function issueToken(userId, url) {
-    return sealer.seal({ u: url, uid: userId, exp: Date.now() + ttlMs });
+  function issueToken(userId, url, userAgent) {
+    return sealer.seal({ u: url, uid: userId, exp: Date.now() + ttlMs, ...(userAgent ? { ua: userAgent } : {}) });
   }
 
-  function playbackFor(userId, url) {
-    return { src: `/api/stream/${issueToken(userId, url)}`, format: detectFormat(url) };
+  function playbackFor(userId, url, { userAgent } = {}) {
+    return { src: `/api/stream/${issueToken(userId, url, userAgent)}`, format: detectFormat(url) };
   }
 
   function readToken(token, userId) {
@@ -31,7 +31,7 @@ export function createStreamService({ httpClient, sealer, config }) {
     if (!payload || typeof payload.u !== 'string') throw new AppError(404, 'Enlace de video inválido.');
     if (payload.uid !== userId) throw forbidden('Este enlace de video pertenece a otra sesión.');
     if (payload.exp < Date.now()) throw new AppError(410, 'El enlace de video caducó. Vuelve a abrir el canal.');
-    return payload.u;
+    return { url: payload.u, userAgent: payload.ua };
   }
 
   function isManifest(upstream, url) {
@@ -42,12 +42,12 @@ export function createStreamService({ httpClient, sealer, config }) {
   }
 
   /** Reescribe cada URI de una lista HLS para que pase por este proxy. */
-  function rewriteManifest(text, baseUrl, userId) {
+  function rewriteManifest(text, baseUrl, userId, userAgent) {
     const proxied = (uri) => {
       try {
         const absolute = new URL(uri, baseUrl);
         if (!['http:', 'https:'].includes(absolute.protocol)) return uri;
-        return `/api/stream/${issueToken(userId, absolute.href)}`;
+        return `/api/stream/${issueToken(userId, absolute.href, userAgent)}`;
       } catch {
         return uri;
       }
@@ -64,16 +64,24 @@ export function createStreamService({ httpClient, sealer, config }) {
   }
 
   async function proxy(req, res, token, userId) {
-    const url = readToken(token, userId);
+    const { url, userAgent } = readToken(token, userId);
     const controller = new AbortController();
     res.on('close', () => controller.abort());
 
     const headers = {};
+    if (userAgent) headers['user-agent'] = userAgent;
     if (req.headers.range && /^bytes=[\d,\s-]+$/.test(req.headers.range)) headers.range = req.headers.range;
 
-    const upstream = await httpClient.request(url, { headers, signal: controller.signal });
+    let upstream;
+    try {
+      upstream = await httpClient.request(url, { headers, signal: controller.signal });
+    } catch (err) {
+      if (!controller.signal.aborted) logFailure(url, err.message);
+      throw err;
+    }
     if (upstream.statusCode >= 400) {
       upstream.resume();
+      logFailure(url, `HTTP ${upstream.statusCode}`);
       const message =
         upstream.statusCode === 403 || upstream.statusCode === 401
           ? 'La fuente rechazó la conexión (credenciales, bloqueo por país o límite de conexiones).'
@@ -96,7 +104,7 @@ export function createStreamService({ httpClient, sealer, config }) {
         }
         chunks.push(chunk);
       }
-      const body = rewriteManifest(Buffer.concat(chunks).toString('utf8'), upstream.finalUrl, userId);
+      const body = rewriteManifest(Buffer.concat(chunks).toString('utf8'), upstream.finalUrl, userId, userAgent);
       res.status(200).type('application/vnd.apple.mpegurl').send(body);
       return;
     }
@@ -109,9 +117,21 @@ export function createStreamService({ httpClient, sealer, config }) {
     }
     try {
       await pipeline(upstream, res);
-    } catch {
-      // El cliente cerró el reproductor o la fuente cortó: no es un error de la app.
+    } catch (err) {
+      // Si el cliente cerró el reproductor no es un error; si la fuente cortó, se registra.
+      if (!controller.signal.aborted) logFailure(url, `cortó la transmisión: ${err.code || err.message}`);
     }
+  }
+
+  /** Registra solo el servidor (nunca la ruta: puede llevar usuario y contraseña). */
+  function logFailure(url, reason) {
+    let host = '?';
+    try {
+      host = new URL(url).host;
+    } catch {
+      /* URL inválida */
+    }
+    logger?.warn(`Video: la fuente ${host} falló (${reason})`);
   }
 
   return { playbackFor, proxy, rewriteManifest };

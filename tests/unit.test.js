@@ -5,6 +5,7 @@ import { detectFormat } from '../src/utils/media-format.js';
 import { isPrivateAddress, parseExternalUrl } from '../src/security/ssrf.js';
 import { createSealer } from '../src/security/crypto.js';
 import { hashPassword, verifyPassword } from '../src/security/password.js';
+import { itemKeySchema } from '../src/validators/schemas.js';
 
 test('parseM3U lee nombre, grupo, logo y tipo', () => {
   const list = parseM3U(
@@ -74,4 +75,13 @@ test('hashPassword usa scrypt con sal y verifica', async () => {
   assert.notEqual(hash, await hashPassword('clave-segura-123'));
   assert.equal(await verifyPassword('clave-segura-123', hash), true);
   assert.equal(await verifyPassword('otra', hash), false);
+});
+
+test('claves de contenido válidas e inválidas', () => {
+  for (const key of ['free:dw-es', 'movie:sintel', 'public:pais:co:12', 'public:cat:sports:0', 'ch:42']) {
+    assert.equal(itemKeySchema.safeParse(key).success, true, key);
+  }
+  for (const key of ['public:co:1', 'public:otro:co:1', '<script>', 'ch:abc', 'public:cat:../x:1']) {
+    assert.equal(itemKeySchema.safeParse(key).success, false, key);
+  }
 });

@@ -49,7 +49,7 @@ export const api = {
   deleteAccount: (data) => request('DELETE', '/account', data),
 
   catalog: () => request('GET', '/catalog'),
-  publicChannels: (country) => request('GET', `/catalog/public/${enc(country)}`),
+  publicChannels: (kind, code) => request('GET', `/catalog/public/${enc(kind)}/${enc(code)}`),
   play: (key) => request('GET', `/play/${enc(key)}`),
 
   playlists: () => request('GET', '/playlists'),

@@ -106,6 +106,10 @@ En producción es obligatorio: **HTTPS** (Caddy, Nginx + Let's Encrypt, o el del
 - **Ancho de banda**: todo el video pasa por tu servidor (por seguridad). Cada espectador consume en el servidor lo mismo que en su casa (~2–8 Mbps en HD).
 - **Series de Xtream**: todavía no se importan (solo TV en vivo y películas).
 
+## Si algo no carga
+
+Ejecuta `npm run diagnostico -- servidor usuario contraseña` (los datos de tu propia cuenta Xtream; son opcionales). Prueba la conexión a las listas públicas, a los canales gratuitos y a tu cuenta por todas las vías (player_api, get.php y varios user-agents) sin mostrar tu usuario ni tu contraseña. Mientras usas la app, la terminal de `npm start` también muestra qué servidor falló y con qué código.
+
 ## Aviso legal
 
 MOGA TV es un **reproductor**: no aloja ni vende canales. Cada usuario es responsable de las listas que agrega. Para **cobrar** por la app con canales de terceros necesitas los derechos de transmisión de esos canales; sin ellos solo puedes monetizar con contenido propio, libre o licenciado.

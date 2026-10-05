@@ -5,23 +5,38 @@ import { store } from '../core/store.js';
 import { emptyState, loading, mediaCard } from '../ui/cards.js';
 
 const PAGE = 120;
+const DEFAULT = { kind: 'pais', code: 'co' };
+
+/** Qué lista mostrar según la URL: #/tv?pais=co, #/tv?cat=sports o #/tv?moga=1. */
+function selection(query, catalog) {
+  if (query.get('moga')) return { kind: 'moga' };
+  const cat = query.get('cat');
+  if (cat && catalog.categories.some((c) => c.code === cat)) return { kind: 'cat', code: cat };
+  const pais = query.get('pais');
+  if (pais && catalog.countries.some((c) => c.code === pais)) return { kind: 'pais', code: pais };
+  return DEFAULT;
+}
+
+function chipRow(label, items, isActive, hrefFor) {
+  return h(
+    'div',
+    { class: 'section' },
+    h('small', { class: 'muted', text: label }),
+    h(
+      'div',
+      { class: 'chips' },
+      items.map((item) => h('a', { class: `chip${isActive(item) ? ' is-active' : ''}`, href: hrefFor(item), text: item.name })),
+    ),
+  );
+}
 
 export async function renderTv(view, { query }) {
   const catalog = await store.loadCatalog();
-  const country = catalog.countries.some((c) => c.code === query.get('pais')) ? query.get('pais') : '';
+  const sel = selection(query, catalog);
 
   const results = h('div', { class: 'section' });
   const search = h('input', { type: 'search', placeholder: 'Buscar canal…', 'aria-label': 'Buscar canal' });
   let items = [];
-
-  const chips = h(
-    'div',
-    { class: 'chips', role: 'tablist' },
-    h('a', { class: `chip${country ? '' : ' is-active'}`, href: '#/tv', text: 'Canales MOGA' }),
-    catalog.countries.map((c) =>
-      h('a', { class: `chip${country === c.code ? ' is-active' : ''}`, href: `#/tv?pais=${c.code}`, text: c.name }),
-    ),
-  );
 
   function draw() {
     const q = normalize(search.value);
@@ -55,28 +70,39 @@ export async function renderTv(view, { query }) {
       h(
         'div',
         { class: 'page__head' },
-        h('div', {}, h('h1', { text: 'TV en vivo' }), h('p', { class: 'muted', text: 'Canales gratuitos y TV pública abierta por país.' })),
+        h('div', {}, h('h1', { text: 'TV en vivo' }), h('p', { class: 'muted', text: 'Miles de canales abiertos por categoría y por país.' })),
       ),
-      chips,
+      chipRow(
+        'Categorías',
+        [{ code: 'moga', name: '★ Canales MOGA' }, ...catalog.categories],
+        (c) => (c.code === 'moga' ? sel.kind === 'moga' : sel.kind === 'cat' && sel.code === c.code),
+        (c) => (c.code === 'moga' ? '#/tv?moga=1' : `#/tv?cat=${c.code}`),
+      ),
+      chipRow(
+        'Países',
+        catalog.countries,
+        (c) => sel.kind === 'pais' && sel.code === c.code,
+        (c) => `#/tv?pais=${c.code}`,
+      ),
       h('div', { class: 'toolbar' }, search),
-      country
+      sel.kind !== 'moga'
         ? h('div', {
             class: 'notice',
-            text: 'Lista pública comunitaria (iptv-org). Algunos canales pueden estar caídos o bloqueados según tu país.',
+            text: 'Listas públicas comunitarias (iptv-org). Algunos canales pueden estar caídos o bloqueados según tu país: si uno no abre, prueba otro.',
           })
         : null,
       results,
     ),
   );
 
-  if (!country) {
+  if (sel.kind === 'moga') {
     items = catalog.channels;
     draw();
     return;
   }
   mount(results, loading());
   try {
-    items = (await api.publicChannels(country)).items;
+    items = (await api.publicChannels(sel.kind, sel.code)).items;
     draw();
   } catch (err) {
     mount(results, emptyState(`No se pudo cargar la lista pública: ${err.message}`));

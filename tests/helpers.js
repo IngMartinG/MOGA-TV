@@ -67,6 +67,36 @@ export async function startFakeIptv() {
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://x');
     const base = `http://${req.headers.host}`;
+    // Panel "estricto": sin player_api y solo acepta user-agent de navegador (como algunos Magma/Xuper).
+    if (url.pathname.startsWith('/strict/')) {
+      const browser = String(req.headers['user-agent'] || '').startsWith('Mozilla/');
+      if (url.pathname === '/strict/player_api.php') {
+        res.statusCode = 400;
+        return res.end('Bad Request');
+      }
+      if (!browser) {
+        res.statusCode = 403;
+        return res.end('Forbidden');
+      }
+      if (url.pathname === '/strict/get.php') {
+        if (url.searchParams.get('password') !== 'clave') {
+          res.statusCode = 401;
+          return res.end();
+        }
+        res.setHeader('content-type', 'audio/x-mpegurl');
+        return res.end(
+          ['#EXTM3U', '#EXTINF:-1 group-title="Deportes",Deportes Estricto', `${base}/strict/live/u/clave/10.m3u8`].join('\n'),
+        );
+      }
+      if (url.pathname === '/strict/live/u/clave/10.m3u8') {
+        res.setHeader('content-type', 'application/vnd.apple.mpegurl');
+        return res.end('#EXTM3U\n#EXTINF:4,\nseg.ts\n');
+      }
+      if (url.pathname.endsWith('.ts')) {
+        res.setHeader('content-type', 'video/mp2t');
+        return res.end(Buffer.from('STRICT-TS'));
+      }
+    }
     if (url.pathname === '/list.m3u') {
       res.setHeader('content-type', 'audio/x-mpegurl');
       return res.end(
