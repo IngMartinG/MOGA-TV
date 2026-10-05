@@ -30,6 +30,15 @@ export function mediaCard(item, { movie = false } = {}) {
     logoBox(item.name, item.logo),
     h('h3', { text: item.name }),
     item.category ? h('small', { text: item.category }) : null,
+    item.status || item.quality
+      ? h(
+          'div',
+          { class: 'card__tags' },
+          item.status === 'ok' ? h('span', { class: 'tag tag--ok', text: '✓ Verificado' }) : null,
+          item.status === 'dead' ? h('span', { class: 'tag tag--dead', text: 'Sin señal' }) : null,
+          item.quality ? h('span', { class: 'tag', text: item.quality }) : null,
+        )
+      : null,
   );
 }
 

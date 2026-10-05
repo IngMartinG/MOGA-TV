@@ -49,7 +49,9 @@ export const api = {
   deleteAccount: (data) => request('DELETE', '/account', data),
 
   catalog: () => request('GET', '/catalog'),
-  publicChannels: (kind, code) => request('GET', `/catalog/public/${enc(kind)}/${enc(code)}`),
+  publicChannels: (kind, code, { all = false } = {}) =>
+    request('GET', `/catalog/public/${enc(kind)}/${enc(code)}${all ? '?todos=1' : ''}`),
+  reportPlay: (key, ok) => request('POST', `/play/${enc(key)}/result`, { ok }),
   play: (key) => request('GET', `/play/${enc(key)}`),
 
   playlists: () => request('GET', '/playlists'),

@@ -35,6 +35,9 @@ export async function renderTv(view, { query }) {
   const sel = selection(query, catalog);
 
   const results = h('div', { class: 'section' });
+  const statusLine = h('small', { class: 'muted' });
+  const showAll = h('input', { type: 'checkbox' });
+  showAll.addEventListener('change', () => loadPublic());
   const search = h('input', { type: 'search', placeholder: 'Buscar canal…', 'aria-label': 'Buscar canal' });
   let items = [];
 
@@ -84,12 +87,19 @@ export async function renderTv(view, { query }) {
         (c) => sel.kind === 'pais' && sel.code === c.code,
         (c) => `#/tv?pais=${c.code}`,
       ),
-      h('div', { class: 'toolbar' }, search),
+      h(
+        'div',
+        { class: 'toolbar' },
+        search,
+        sel.kind !== 'moga' ? h('label', { class: 'check' }, showAll, 'Mostrar también los que no tienen señal') : null,
+      ),
       sel.kind !== 'moga'
-        ? h('div', {
-            class: 'notice',
-            text: 'Listas públicas comunitarias (iptv-org). Algunos canales pueden estar caídos o bloqueados según tu país: si uno no abre, prueba otro.',
-          })
+        ? h(
+            'div',
+            { class: 'notice' },
+            'Canales abiertos de la API de iptv-org. MOGA TV comprueba cada canal y muestra primero los que funcionan (✓ Verificado). ',
+            statusLine,
+          )
         : null,
       results,
     ),
@@ -101,10 +111,28 @@ export async function renderTv(view, { query }) {
     return;
   }
   mount(results, loading());
-  try {
-    items = (await api.publicChannels(sel.kind, sel.code)).items;
+  await loadPublic();
+
+  /**
+   * Carga la lista pública. Mientras el servidor sigue verificando canales,
+   * se vuelve a pedir cada 12 s para que aparezcan los nuevos verificados.
+   */
+  async function loadPublic(refreshes = 0) {
+    let data;
+    try {
+      data = await api.publicChannels(sel.kind, sel.code, { all: showAll.checked });
+    } catch (err) {
+      mount(results, emptyState(`No se pudo cargar la lista: ${err.message}`));
+      return;
+    }
+    if (!results.isConnected && refreshes > 0) return; // el usuario ya cambió de pantalla
+    items = data.items;
+    const { ok, pending, dead } = data.stats;
+    statusLine.textContent =
+      `${ok} verificados` +
+      (pending ? ` · verificando ${pending}…` : '') +
+      (dead ? ` · ${dead} sin señal ${showAll.checked ? '(mostrados al final)' : '(ocultos)'}` : '');
     draw();
-  } catch (err) {
-    mount(results, emptyState(`No se pudo cargar la lista pública: ${err.message}`));
+    if (pending && refreshes < 10) setTimeout(() => results.isConnected && loadPublic(refreshes + 1), 12000);
   }
 }

@@ -1,17 +1,34 @@
-import { FREE_CHANNELS, FREE_MOVIES, PUBLIC_CATEGORIES, PUBLIC_COUNTRIES, PUBLIC_SOURCES } from '../data/catalog.js';
-import { parseM3U } from '../utils/m3u-parser.js';
+import { FREE_CHANNELS, FREE_MOVIES, PUBLIC_CATEGORIES, PUBLIC_COUNTRIES } from '../data/catalog.js';
 import { notFound } from '../utils/errors.js';
 
-const PUBLIC_CACHE_MS = 6 * 60 * 60 * 1000;
-const MAX_PUBLIC_CHANNELS = 3000;
+const CATEGORY_NAMES = new Map([
+  ...PUBLIC_CATEGORIES.map((c) => [c.code, c.name]),
+  ['general', 'General'],
+  ['culture', 'Cultura'],
+  ['education', 'Educación'],
+  ['religious', 'Religión'],
+  ['lifestyle', 'Estilo de vida'],
+  ['business', 'Negocios'],
+  ['legislative', 'Institucional'],
+  ['outdoor', 'Aire libre'],
+  ['travel', 'Viajes'],
+  ['cooking', 'Cocina'],
+  ['family', 'Familia'],
+  ['classic', 'Clásicos'],
+  ['science', 'Ciencia'],
+  ['auto', 'Motor'],
+  ['weather', 'Clima'],
+  ['shop', 'Compras'],
+  ['relax', 'Relax'],
+]);
+const COUNTRY_NAMES = new Map(PUBLIC_COUNTRIES.map((c) => [c.code.toUpperCase(), c.name]));
+const STATUS_ORDER = { ok: 0, pending: 1, dead: 2 };
 
 /**
- * Catálogo incluido + canales públicos de iptv-org por país o categoría,
- * con caché en memoria (se descargan una vez cada 6 horas).
+ * Catálogo: canales y películas incluidos + canales públicos de la API de iptv-org,
+ * ordenados por estado de verificación (los que funcionan primero).
  */
-export function createCatalogService({ httpClient, logger }) {
-  const publicCache = new Map(); // "pais:co" -> { at, channels, pending }
-
+export function createCatalogService({ iptvorg, streamHealth }) {
   function freeChannels() {
     return FREE_CHANNELS.map(({ url, ...item }) => ({ ...item, key: `free:${item.id}`, logo: null }));
   }
@@ -20,69 +37,65 @@ export function createCatalogService({ httpClient, logger }) {
     return FREE_MOVIES.map(({ url, ...item }) => ({ ...item, key: `movie:${item.id}`, logo: null }));
   }
 
-  function sourceFor(kind, code) {
-    const source = PUBLIC_SOURCES[kind];
-    const entry = source?.list.find((c) => c.code === code);
-    if (!entry) throw notFound('Lista pública no disponible.');
-    return { url: source.url(code), name: entry.name };
+  function describe(stream) {
+    const category = stream.categories.map((c) => CATEGORY_NAMES.get(c)).find(Boolean);
+    const country = COUNTRY_NAMES.get(stream.country);
+    return [category || stream.group, country].filter(Boolean).join(' · ');
   }
 
-  async function loadPublic(kind, code) {
-    const { url } = sourceFor(kind, code);
-    const cacheKey = `${kind}:${code}`;
-    const cached = publicCache.get(cacheKey);
-    if (cached?.channels && Date.now() - cached.at < PUBLIC_CACHE_MS) return cached.channels;
-    if (cached?.pending) return cached.pending;
+  /**
+   * Canales públicos de un país o categoría. Por defecto oculta los que la
+   * verificación encontró caídos; con includeDead los muestra al final.
+   */
+  async function publicChannels(kind, code, { includeDead = false } = {}) {
+    const streams = await iptvorg.list(kind, code);
+    const rows = streamHealth.statuses(streams);
+    streamHealth.enqueueStale(streams, rows);
 
-    const pending = httpClient
-      .getText(url, { maxBytes: 20 * 1024 * 1024 })
-      .then(({ text, finalUrl }) => {
-        const channels = parseM3U(text, finalUrl)
-          .filter((c) => c.mediaType === 'live')
-          .slice(0, MAX_PUBLIC_CHANNELS);
-        publicCache.set(cacheKey, { at: Date.now(), channels });
-        return channels;
-      })
-      .catch((err) => {
-        logger.warn(`No se pudo cargar la lista pública "${cacheKey}": ${err.message}`);
-        // Si falla, sirve la versión anterior en caché si existe.
-        if (cached?.channels) {
-          publicCache.set(cacheKey, cached);
-          return cached.channels;
-        }
-        publicCache.delete(cacheKey);
-        throw err;
+    const stats = { ok: 0, pending: 0, dead: 0 };
+    const items = [];
+    streams.forEach((s, position) => {
+      const status = streamHealth.statusOf(rows.get(s.id));
+      stats[status] += 1;
+      if (status === 'dead' && !includeDead) return;
+      items.push({
+        key: `pub:${s.id}`,
+        name: s.name,
+        logo: s.logo,
+        category: describe(s),
+        quality: s.quality,
+        status,
+        position,
       });
-    publicCache.set(cacheKey, { ...cached, pending });
-    return pending;
+    });
+    items.sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status] || a.position - b.position);
+    return { items: items.map(({ position, ...item }) => item), stats };
   }
 
-  async function publicChannels(kind, code) {
-    const channels = await loadPublic(kind, code);
-    return channels.map((c, index) => ({
-      key: `public:${kind}:${code}:${index}`,
-      id: index,
-      name: c.name,
-      logo: c.logo,
-      category: c.group,
-    }));
-  }
-
-  /** Resuelve una clave de catálogo a su URL real (solo uso interno del servidor). */
+  /** Resuelve una clave a su URL real y cabeceras (solo uso interno del servidor). */
   async function resolveKey(key) {
-    const [kind, a, b, c] = String(key).split(':');
+    const [kind, id] = String(key).split(':');
     if (kind === 'free') {
-      const item = FREE_CHANNELS.find((ch) => ch.id === a);
+      const item = FREE_CHANNELS.find((ch) => ch.id === id);
       if (item) return { url: item.url, title: item.name, logo: null, subtitle: item.category, live: true };
     }
     if (kind === 'movie') {
-      const item = FREE_MOVIES.find((m) => m.id === a);
+      const item = FREE_MOVIES.find((m) => m.id === id);
       if (item) return { url: item.url, title: item.name, logo: null, subtitle: `${item.category} · ${item.year}`, live: false };
     }
-    if (kind === 'public') {
-      const channels = await loadPublic(a, b);
-      const item = channels[Number(c)];
-      if (item) return { url: item.url, title: item.name, logo: item.logo, subtitle: item.group, live: true };
+    if (kind === 'pub') {
+      const stream = await iptvorg.get(id);
+      if (stream) {
+        return {
+          url: stream.url,
+          title: stream.name,
+          logo: stream.logo,
+          subtitle: describe(stream),
+          live: true,
+          headers: { userAgent: stream.userAgent, referrer: stream.referrer },
+          stream,
+        };
+      }
     }
     throw notFound('Ese contenido ya no está disponible.');
   }

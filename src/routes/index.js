@@ -35,6 +35,7 @@ export function createApiRouter({ controllers, streamService }) {
   api.get('/catalog', catalog.home);
   api.get('/catalog/public/:kind/:code', catalog.publicChannels);
   api.get('/play/:key', catalog.play);
+  api.post('/play/:key/result', catalog.playResult);
 
   const limitPlaylist = playlistLimiter();
   api.get('/playlists', playlists.list);

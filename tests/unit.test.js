@@ -78,10 +78,10 @@ test('hashPassword usa scrypt con sal y verifica', async () => {
 });
 
 test('claves de contenido válidas e inválidas', () => {
-  for (const key of ['free:dw-es', 'movie:sintel', 'public:pais:co:12', 'public:cat:sports:0', 'ch:42']) {
+  for (const key of ['free:dw-es', 'movie:sintel', 'pub:0123456789abcdef', 'ch:42']) {
     assert.equal(itemKeySchema.safeParse(key).success, true, key);
   }
-  for (const key of ['public:co:1', 'public:otro:co:1', '<script>', 'ch:abc', 'public:cat:../x:1']) {
+  for (const key of ['public:pais:co:1', 'pub:XYZ', 'pub:0123', '<script>', 'ch:abc']) {
     assert.equal(itemKeySchema.safeParse(key).success, false, key);
   }
 });

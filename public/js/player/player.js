@@ -177,6 +177,11 @@ function describeHlsError(data) {
   return 'No se pudo reproducir la señal.';
 }
 
+/** Informa al servidor si un canal público arrancó, para mejorar la verificación. */
+function report(key, ok) {
+  if (String(key).startsWith('pub:')) api.reportPlay(key, ok).catch(() => {});
+}
+
 let midStreamRetries = 0;
 /** Si una señal en vivo se corta después de haber arrancado, se reconecta una vez. */
 async function handleMidStreamFailure() {
@@ -216,6 +221,7 @@ async function start(item, { keepRetries = false } = {}) {
       if (mySession === session) {
         els.overlay.hidden = true;
         current.started = true;
+        report(item.key, true);
       }
       return;
     } catch (err) {
@@ -225,6 +231,7 @@ async function start(item, { keepRetries = false } = {}) {
     }
   }
   if (mySession === session) {
+    report(item.key, false);
     setStatus(
       `${lastError} Puede que el canal esté caído, bloqueado para tu país o use un códec que el navegador no soporta (por ejemplo HEVC/AC3).`,
       true,

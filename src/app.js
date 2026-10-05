@@ -10,6 +10,9 @@ import { createPlaylistRepository } from './repositories/playlist.repository.js'
 import { createFavoriteRepository } from './repositories/favorite.repository.js';
 import { createAuthService } from './services/auth.service.js';
 import { createCatalogService } from './services/catalog.service.js';
+import { createIptvOrgService } from './services/iptvorg.service.js';
+import { createStreamHealthService } from './services/stream-health.service.js';
+import { createHealthRepository } from './repositories/health.repository.js';
 import { createStreamService } from './services/stream.service.js';
 import { createPlaylistService } from './services/playlist.service.js';
 import { createFavoriteService } from './services/favorite.service.js';
@@ -42,7 +45,13 @@ export function createApp(config, { logger = createLogger() } = {}) {
   };
 
   const authService = createAuthService({ users: repos.users, sessions: repos.sessions, config });
-  const catalogService = createCatalogService({ httpClient, logger });
+  const iptvorg = createIptvOrgService({ httpClient, logger, config });
+  const streamHealth = createStreamHealthService({
+    httpClient,
+    health: createHealthRepository(db),
+    logger,
+  });
+  const catalogService = createCatalogService({ iptvorg, streamHealth });
   const streamService = createStreamService({ httpClient, sealer, config, logger });
   const playlistService = createPlaylistService({
     playlists: repos.playlists,
@@ -59,7 +68,7 @@ export function createApp(config, { logger = createLogger() } = {}) {
 
   const controllers = {
     auth: createAuthController({ authService, config }),
-    catalog: createCatalogController({ catalogService, playlistService, streamService }),
+    catalog: createCatalogController({ catalogService, playlistService, streamService, streamHealth }),
     playlists: createPlaylistController({ playlistService }),
     favorites: createFavoriteController({ favoriteService }),
   };
@@ -101,6 +110,16 @@ export function createApp(config, { logger = createLogger() } = {}) {
   app.get(/^\/(?!api\/|vendor\/).*/, (_req, res) => res.sendFile(resolve(config.publicDir, 'index.html')));
 
   app.use(errorHandler(logger));
+
+  // Al arrancar: descarga el índice de canales y empieza a verificar los más usados.
+  if (config.healthWarmup) {
+    iptvorg
+      .ensureLoaded()
+      .then(() =>
+        Promise.all([['pais', 'co'], ['cat', 'sports'], ['cat', 'news']].map(([k, c]) => catalogService.publicChannels(k, c))),
+      )
+      .catch((err) => logger.warn(`Precarga de canales públicos: ${err.message}`));
+  }
 
   const cleanup = setInterval(() => authService.purgeExpired(), 60 * 60 * 1000);
   cleanup.unref();

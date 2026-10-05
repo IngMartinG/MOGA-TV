@@ -286,6 +286,48 @@ select:focus {
   color: #cbd5e1;
 }
 
+.card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tag {
+  padding: 1px 7px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--surface-2);
+  color: #cbd5e1;
+}
+
+.tag--ok {
+  background: rgb(52 211 153 / 15%);
+  color: var(--ok);
+}
+
+.tag--dead {
+  background: rgb(248 113 113 / 15%);
+  color: var(--danger);
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.toolbar .check input,
+.check input {
+  flex: none;
+  width: 18px;
+  min-height: 18px;
+  accent-color: var(--accent);
+}
+
 .badge--live {
   background: rgb(230 57 70 / 20%);
   color: #fecaca;

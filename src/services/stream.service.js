@@ -18,12 +18,19 @@ const FORWARDED_HEADERS = ['content-length', 'content-range', 'accept-ranges', '
 export function createStreamService({ httpClient, sealer, config, logger }) {
   const ttlMs = config.streamTokenTtlMinutes * 60 * 1000;
 
-  function issueToken(userId, url, userAgent) {
-    return sealer.seal({ u: url, uid: userId, exp: Date.now() + ttlMs, ...(userAgent ? { ua: userAgent } : {}) });
+  /** headers: { userAgent, referrer } que exige la fuente; viajan cifrados en el token. */
+  function issueToken(userId, url, headers = {}) {
+    return sealer.seal({
+      u: url,
+      uid: userId,
+      exp: Date.now() + ttlMs,
+      ...(headers.userAgent ? { ua: headers.userAgent } : {}),
+      ...(headers.referrer ? { ref: headers.referrer } : {}),
+    });
   }
 
-  function playbackFor(userId, url, { userAgent } = {}) {
-    return { src: `/api/stream/${issueToken(userId, url, userAgent)}`, format: detectFormat(url) };
+  function playbackFor(userId, url, headers = {}) {
+    return { src: `/api/stream/${issueToken(userId, url, headers)}`, format: detectFormat(url) };
   }
 
   function readToken(token, userId) {
@@ -31,7 +38,7 @@ export function createStreamService({ httpClient, sealer, config, logger }) {
     if (!payload || typeof payload.u !== 'string') throw new AppError(404, 'Enlace de video inválido.');
     if (payload.uid !== userId) throw forbidden('Este enlace de video pertenece a otra sesión.');
     if (payload.exp < Date.now()) throw new AppError(410, 'El enlace de video caducó. Vuelve a abrir el canal.');
-    return { url: payload.u, userAgent: payload.ua };
+    return { url: payload.u, headers: { userAgent: payload.ua, referrer: payload.ref } };
   }
 
   function isManifest(upstream, url) {
@@ -42,12 +49,12 @@ export function createStreamService({ httpClient, sealer, config, logger }) {
   }
 
   /** Reescribe cada URI de una lista HLS para que pase por este proxy. */
-  function rewriteManifest(text, baseUrl, userId, userAgent) {
+  function rewriteManifest(text, baseUrl, userId, upstreamHeaders = {}) {
     const proxied = (uri) => {
       try {
         const absolute = new URL(uri, baseUrl);
         if (!['http:', 'https:'].includes(absolute.protocol)) return uri;
-        return `/api/stream/${issueToken(userId, absolute.href, userAgent)}`;
+        return `/api/stream/${issueToken(userId, absolute.href, upstreamHeaders)}`;
       } catch {
         return uri;
       }
@@ -64,12 +71,11 @@ export function createStreamService({ httpClient, sealer, config, logger }) {
   }
 
   async function proxy(req, res, token, userId) {
-    const { url, userAgent } = readToken(token, userId);
+    const { url, headers: upstreamHeaders } = readToken(token, userId);
     const controller = new AbortController();
     res.on('close', () => controller.abort());
 
-    const headers = {};
-    if (userAgent) headers['user-agent'] = userAgent;
+    const headers = sourceHeaders(upstreamHeaders);
     if (req.headers.range && /^bytes=[\d,\s-]+$/.test(req.headers.range)) headers.range = req.headers.range;
 
     let upstream;
@@ -104,7 +110,7 @@ export function createStreamService({ httpClient, sealer, config, logger }) {
         }
         chunks.push(chunk);
       }
-      const body = rewriteManifest(Buffer.concat(chunks).toString('utf8'), upstream.finalUrl, userId, userAgent);
+      const body = rewriteManifest(Buffer.concat(chunks).toString('utf8'), upstream.finalUrl, userId, upstreamHeaders);
       res.status(200).type('application/vnd.apple.mpegurl').send(body);
       return;
     }
@@ -135,4 +141,19 @@ export function createStreamService({ httpClient, sealer, config, logger }) {
   }
 
   return { playbackFor, proxy, rewriteManifest };
+}
+
+/** Cabeceras HTTP que exige una fuente (algunos canales solo responden con su Referer). */
+export function sourceHeaders({ userAgent, referrer } = {}) {
+  const headers = {};
+  if (userAgent) headers['user-agent'] = userAgent;
+  if (referrer) {
+    headers.referer = referrer;
+    try {
+      headers.origin = new URL(referrer).origin;
+    } catch {
+      /* referrer inválido: solo se envía tal cual */
+    }
+  }
+  return headers;
 }

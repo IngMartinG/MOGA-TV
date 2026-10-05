@@ -10,8 +10,11 @@ function publicRow(title, kind, code) {
   api
     .publicChannels(kind, code)
     .then(({ items }) => {
-      if (!items.length) return el.remove();
-      row.replaceChildren(...items.slice(0, 24).map((c) => mediaCard(c)));
+      // Solo los que funcionan; si aún no hay verificados, los primeros sin probar.
+      const verified = items.filter((c) => c.status === 'ok');
+      const shown = (verified.length >= 6 ? verified : items).slice(0, 24);
+      if (!shown.length) return el.remove();
+      row.replaceChildren(...shown.map((c) => mediaCard(c)));
     })
     .catch(() => el.remove());
   return el;
