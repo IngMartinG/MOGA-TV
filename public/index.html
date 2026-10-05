@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#07090e">
+  <meta name="theme-color" content="#0a0b12">
   <meta name="description" content="MOGA TV: TV en vivo, películas y tus listas IPTV en un solo lugar.">
   <title>MOGA TV</title>
   <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
@@ -48,7 +48,7 @@
 
   <!-- Aplicación -->
   <div id="app" class="shell" hidden>
-    <aside class="sidebar">
+    <header class="topbar">
       <a class="brand" href="#/">MOGA<span>TV</span></a>
       <nav class="nav" aria-label="Principal">
         <a href="#/" data-nav="home"><span class="ico" aria-hidden="true">⌂</span>Inicio</a>
@@ -56,13 +56,15 @@
         <a href="#/peliculas" data-nav="peliculas"><span class="ico" aria-hidden="true">▶</span>Películas</a>
         <a href="#/listas" data-nav="listas"><span class="ico" aria-hidden="true">☰</span>Mis listas</a>
         <a href="#/favoritos" data-nav="favoritos"><span class="ico" aria-hidden="true">★</span>Favoritos</a>
-        <a href="#/cuenta" data-nav="cuenta"><span class="ico" aria-hidden="true">●</span>Mi cuenta</a>
       </nav>
-      <div class="sidebar__user">
-        <span class="avatar" id="user-avatar"></span>
-        <div><strong id="user-name"></strong><small id="user-email" class="muted"></small></div>
+      <div class="topbar__right">
+        <time id="clock" class="clock"></time>
+        <a class="topbar__user" href="#/cuenta" data-nav="cuenta" title="Mi cuenta">
+          <span class="avatar" id="user-avatar"></span>
+          <span class="topbar__name"><strong id="user-name"></strong><small id="user-email" class="muted"></small></span>
+        </a>
       </div>
-    </aside>
+    </header>
     <main id="view" class="view" tabindex="-1"></main>
   </div>
 

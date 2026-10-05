@@ -11,6 +11,7 @@ import { createFavoriteRepository } from './repositories/favorite.repository.js'
 import { createAuthService } from './services/auth.service.js';
 import { createCatalogService } from './services/catalog.service.js';
 import { createIptvOrgService } from './services/iptvorg.service.js';
+import { createArchiveService } from './services/archive.service.js';
 import { createStreamHealthService } from './services/stream-health.service.js';
 import { createHealthRepository } from './repositories/health.repository.js';
 import { createStreamService } from './services/stream.service.js';
@@ -51,7 +52,8 @@ export function createApp(config, { logger = createLogger() } = {}) {
     health: createHealthRepository(db),
     logger,
   });
-  const catalogService = createCatalogService({ iptvorg, streamHealth });
+  const archive = createArchiveService({ httpClient, logger, config });
+  const catalogService = createCatalogService({ iptvorg, streamHealth, archive });
   const streamService = createStreamService({ httpClient, sealer, config, logger });
   const playlistService = createPlaylistService({
     playlists: repos.playlists,

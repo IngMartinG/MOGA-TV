@@ -78,6 +78,8 @@ export function loadConfig(overrides = {}) {
     upstreamTimeoutMs: int(env.UPSTREAM_TIMEOUT_MS, 20000),
     // API abierta de iptv-org (canales, streams, logos). Configurable para pruebas.
     iptvorgApiBase: (env.IPTVORG_API_BASE || 'https://iptv-org.github.io/api').replace(/\/$/, ''),
+    // API de Internet Archive (películas de dominio público). Configurable para pruebas.
+    archiveBase: (env.ARCHIVE_BASE || 'https://archive.org').replace(/\/$/, ''),
     // Verificación de canales en segundo plano al arrancar (se desactiva en pruebas).
     healthWarmup: bool(env.HEALTH_WARMUP, true),
   });

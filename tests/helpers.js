@@ -102,6 +102,49 @@ export async function startFakeIptv() {
         return res.end(Buffer.from('STRICT-TS'));
       }
     }
+    // Mini Internet Archive
+    if (url.pathname.startsWith('/archive/')) {
+      const path = url.pathname.slice(8);
+      if (path === '/advancedsearch.php') {
+        res.setHeader('content-type', 'application/json');
+        return res.end(
+          JSON.stringify({
+            response: {
+              docs: [
+                { identifier: 'NightOfTheLivingDead', title: 'Night of the Living Dead', year: '1968', description: '<b>Clásico</b> de terror' },
+                { identifier: '../malo', title: 'Malo' },
+              ],
+            },
+          }),
+        );
+      }
+      if (path === '/metadata/NightOfTheLivingDead') {
+        res.setHeader('content-type', 'application/json');
+        return res.end(
+          JSON.stringify({
+            metadata: { title: 'Night of the Living Dead', year: '1968' },
+            files: [
+              { name: 'night.ogv', format: 'Ogg Video', size: '100' },
+              { name: 'night_512kb.mp4', format: '512Kb MPEG4', size: '200' },
+              { name: 'night.mp4', format: 'h.264', size: '900' },
+              { name: 'trailer.mp4', format: 'h.264', size: '9999' },
+            ],
+          }),
+        );
+      }
+      if (path === '/download/NightOfTheLivingDead/night.mp4') {
+        res.setHeader('content-type', 'video/mp4');
+        res.setHeader('accept-ranges', 'bytes');
+        if (req.headers.range) {
+          res.statusCode = 206;
+          res.setHeader('content-range', 'bytes 0-3/10');
+          return res.end('MP4-');
+        }
+        return res.end('MP4-MOVIE!');
+      }
+      res.statusCode = 404;
+      return res.end();
+    }
     // Mini API iptv-org
     if (url.pathname.startsWith('/api/')) {
       const api = {

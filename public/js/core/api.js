@@ -51,6 +51,7 @@ export const api = {
   catalog: () => request('GET', '/catalog'),
   publicChannels: (kind, code, { all = false } = {}) =>
     request('GET', `/catalog/public/${enc(kind)}/${enc(code)}${all ? '?todos=1' : ''}`),
+  archiveMovies: (code) => request('GET', `/movies/archive/${enc(code)}`),
   reportPlay: (key, ok) => request('POST', `/play/${enc(key)}/result`, { ok }),
   play: (key) => request('GET', `/play/${enc(key)}`),
 

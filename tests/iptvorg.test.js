@@ -9,7 +9,7 @@ let c;
 
 before(async () => {
   iptv = await startFakeIptv();
-  app = await startApp({ IPTVORG_API_BASE: `${iptv.base}/api` });
+  app = await startApp({ IPTVORG_API_BASE: `${iptv.base}/api`, ARCHIVE_BASE: `${iptv.base}/archive` });
   c = createClient(app.base);
   await c.post('/api/auth/register', { email: 'pub@example.com', name: 'Pub', password: 'clave-segura-1' });
 });
@@ -118,5 +118,37 @@ describe('API iptv-org', () => {
   test('rechaza listas que no existen', async () => {
     assert.equal((await c.get('/api/catalog/public/pais/zz')).status, 404);
     assert.equal((await c.get('/api/catalog/public/otro/co')).status, 400);
+  });
+});
+
+describe('Películas de Internet Archive', () => {
+  test('lista una categoría con portada y descarta identificadores raros', async () => {
+    const res = await c.get('/api/movies/archive/terror');
+    assert.equal(res.status, 200, JSON.stringify(res.data));
+    assert.equal(res.data.items.length, 1);
+    const [movie] = res.data.items;
+    assert.equal(movie.key, 'ia:NightOfTheLivingDead');
+    assert.equal(movie.year, 1968);
+    assert.equal(movie.description, 'Clásico de terror', 'sin HTML');
+    assert.match(movie.logo, /services\/img\/NightOfTheLivingDead$/);
+    assert.equal((await c.get('/api/movies/archive/noexiste')).status, 404);
+  });
+
+  test('reproduce el mejor MP4 (no el tráiler) con soporte de saltos (Range)', async () => {
+    const play = await c.get('/api/play/ia:NightOfTheLivingDead');
+    assert.equal(play.status, 200, JSON.stringify(play.data));
+    assert.equal(play.data.format, 'native');
+    assert.equal(play.data.live, false);
+    const full = await c.get(play.data.src);
+    assert.equal(full.data, 'MP4-MOVIE!');
+    const part = await c.get(play.data.src, { range: 'bytes=0-3' });
+    assert.equal(part.status, 206);
+    assert.equal(part.headers.get('content-range'), 'bytes 0-3/10');
+  });
+
+  test('películas como favoritos', async () => {
+    assert.equal((await c.put('/api/favorites/ia:NightOfTheLivingDead')).status, 204);
+    const favs = await c.get('/api/favorites');
+    assert.ok(favs.data.items.some((f) => f.name === 'Night of the Living Dead'));
   });
 });

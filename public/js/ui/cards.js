@@ -5,8 +5,9 @@ function logoBox(name, logo) {
   const box = h('div', { class: 'card__logo', style: { color: colorFor(name) } }, initials(name));
   if (logo) {
     const img = h('img', { src: logo, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' });
-    // Si el logo no carga, se quedan las iniciales.
-    img.addEventListener('load', () => box.replaceChildren(img), { once: true });
+    // Si la imagen no carga, quedan visibles las iniciales.
+    img.addEventListener('error', () => img.remove(), { once: true });
+    box.append(img);
   }
   return box;
 }

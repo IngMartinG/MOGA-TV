@@ -90,7 +90,20 @@ setUnauthorizedHandler(() => {
   logout({ skipRequest: true });
 });
 
+/** Reloj de la barra superior, como en las apps de TV. */
+function startClock() {
+  const clock = $('#clock');
+  const tick = () => {
+    const now = new Date();
+    clock.textContent = now.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
+    clock.dateTime = now.toISOString();
+  };
+  tick();
+  setInterval(tick, 15000);
+}
+
 async function boot() {
+  startClock();
   initPlayer();
   initTvNavigation();
   initAuthScreen({ onAuthenticated: enterApp });

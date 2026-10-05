@@ -28,7 +28,7 @@ const STATUS_ORDER = { ok: 0, pending: 1, dead: 2 };
  * Catálogo: canales y películas incluidos + canales públicos de la API de iptv-org,
  * ordenados por estado de verificación (los que funcionan primero).
  */
-export function createCatalogService({ iptvorg, streamHealth }) {
+export function createCatalogService({ iptvorg, streamHealth, archive }) {
   function freeChannels() {
     return FREE_CHANNELS.map(({ url, ...item }) => ({ ...item, key: `free:${item.id}`, logo: null }));
   }
@@ -83,6 +83,10 @@ export function createCatalogService({ iptvorg, streamHealth }) {
       const item = FREE_MOVIES.find((m) => m.id === id);
       if (item) return { url: item.url, title: item.name, logo: null, subtitle: `${item.category} · ${item.year}`, live: false };
     }
+    if (kind === 'ia') {
+      const movie = await archive.resolve(id);
+      return { url: movie.url, title: movie.title, logo: movie.logo, subtitle: movie.year ? `Película · ${movie.year}` : 'Película', live: false };
+    }
     if (kind === 'pub') {
       const stream = await iptvorg.get(id);
       if (stream) {
@@ -105,6 +109,8 @@ export function createCatalogService({ iptvorg, streamHealth }) {
     freeMovies,
     countries: () => PUBLIC_COUNTRIES,
     categories: () => PUBLIC_CATEGORIES,
+    movieCategories: () => archive.categories(),
+    movies: (code) => archive.list(code),
     publicChannels,
     resolveKey,
   };
