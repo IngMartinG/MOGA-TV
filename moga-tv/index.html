@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#080b10">
+  <title>MOGA TV</title>
+  <script defer src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#080b10;color:#f4f7fb;font-family:Inter,Segoe UI,system-ui,sans-serif}button,input{font:inherit}
+    .app{min-height:100vh;display:grid;grid-template-columns:280px minmax(0,1fr)}
+    aside{position:sticky;top:0;height:100vh;padding:18px;background:#0d1219;border-right:1px solid #263241}
+    .logo{display:flex;align-items:center;gap:10px;font-size:24px;font-weight:950;margin-bottom:22px}.mark{display:grid;place-items:center;width:42px;height:42px;border-radius:10px;background:#fff;color:#111}
+    .nav{display:grid;gap:8px}.nav button,.btn,.iconbtn,.tab{min-height:42px;border:1px solid #293647;border-radius:10px;background:#121a24;color:#f4f7fb;padding:0 13px;cursor:pointer}
+    .nav button{display:flex;align-items:center;justify-content:space-between;text-align:left}.nav button.active,.btn.primary,.tab.active{background:#f43f5e;border-color:#f43f5e;color:#fff}.nav small{color:#99a7b8}
+    .side-note{position:absolute;bottom:18px;left:18px;right:18px;color:#99a7b8;font-size:12px;line-height:1.45;border:1px solid #293647;border-radius:10px;padding:12px;background:#111923}
+    main{min-width:0}.top{position:sticky;top:0;z-index:5;display:flex;gap:10px;align-items:center;padding:16px 22px;background:#080b10dd;backdrop-filter:blur(14px);border-bottom:1px solid #263241}
+    .search{flex:1}.search input{width:100%;height:44px;border:1px solid #293647;border-radius:10px;background:#101720;color:#f4f7fb;padding:0 14px;outline:none}
+    .hero{min-height:260px;display:flex;align-items:end;padding:34px 26px;background:linear-gradient(90deg,#080b10 0%,#080b10cc 42%,#080b1044),url("https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=1600&q=80") center/cover;border-bottom:1px solid #263241}
+    .hero h1{margin:0;font-size:clamp(44px,7vw,88px);line-height:.92}.hero p{max-width:680px;color:#b7c3d2;line-height:1.6}.hero .ey{color:#34d399;font-weight:900;font-size:12px;letter-spacing:.08em}
+    .content{padding:24px 26px}.title{display:flex;align-items:end;justify-content:space-between;gap:14px;margin-bottom:16px}.title h2{margin:0;font-size:28px}.muted{color:#99a7b8}
+    .sources{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;margin-bottom:24px}.source{min-height:140px;text-align:left;border:1px solid #293647;border-radius:12px;background:linear-gradient(135deg,#f43f5e22,transparent 55%),#101720;color:#fff;padding:16px;cursor:pointer}.source:hover{border-color:#f43f5e}.source strong{display:block;font-size:20px;margin:7px 0}.source span{color:#99a7b8;font-size:13px}
+    .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.tab{min-height:38px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+    .card{position:relative;min-height:150px;border:1px solid #293647;border-radius:12px;background:#101720;color:#fff;padding:13px;cursor:pointer;text-align:left;overflow:hidden}.card:hover{border-color:#64748b;transform:translateY(-1px)}.badge{display:inline-flex;min-height:22px;align-items:center;border-radius:999px;background:#263241;color:#c7d2df;padding:0 8px;font-size:11px}.card .logoBox{width:54px;height:54px;border-radius:12px;display:grid;place-items:center;font-weight:900;margin:10px 0;background:#263241;color:#34d399;overflow:hidden}.card img{max-width:100%;max-height:100%;object-fit:contain}.card h3{font-size:15px;margin:0 0 6px;line-height:1.25}
+    .empty{border:1px dashed #334155;border-radius:12px;padding:26px;color:#99a7b8;text-align:center;background:#101720}.notice{border:1px solid #6b4b16;background:#231a0d;border-radius:12px;padding:13px;color:#f8e3b0;margin-bottom:16px;line-height:1.5}
+    dialog{border:1px solid #293647;border-radius:14px;background:#101720;color:#fff;padding:0;max-width:560px;width:calc(100vw - 28px)}dialog::backdrop{background:#000b}.modal{padding:20px}.modal h2{margin:0 0 8px}.field{display:grid;gap:6px;margin:12px 0}.field label{font-size:12px;color:#99a7b8}.field input{height:42px;border:1px solid #293647;border-radius:10px;background:#0b1017;color:#fff;padding:0 12px}.row{display:flex;gap:10px}.row>*{flex:1}.actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}.btn{display:inline-flex;align-items:center;justify-content:center;text-decoration:none}.btn.primary{font-weight:800}.btn.ghost{background:transparent}
+    .player{position:fixed;inset:0;display:none;place-items:center;background:#000d;z-index:30;padding:16px}.player.on{display:grid}.playerBox{width:min(1080px,100%);border:1px solid #293647;border-radius:14px;background:#0b1017;overflow:hidden}.playerHead{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 16px;background:#111923}.videoWrap{position:relative;background:#000;min-height:320px}video{width:100%;aspect-ratio:16/9;background:#000;display:block}.status{padding:12px 14px;background:#0f1722;color:#b7c3d2;font-size:13px;word-break:break-all}.status.error{color:#fecaca;background:#1b0f12}.playerControls{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:13px 16px;background:#111923}
+    @media(max-width:820px){.app{grid-template-columns:1fr}aside{position:relative;height:auto}.side-note{position:static;margin-top:16px}.top{flex-wrap:wrap}.search{flex-basis:100%;order:3}.hero{min-height:230px}.grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside>
+      <div class="logo"><span class="mark">M</span>MOGA TV</div>
+      <div class="nav" id="sourceNav"></div>
+      <div class="side-note">Solo se muestran canales o películas con URL real. Si una fuente no tiene stream, no aparece.</div>
+    </aside>
+    <main>
+      <div class="top">
+        <button class="btn primary" id="addBtn">Agregar M3U/Xtream</button>
+        <button class="btn" id="resetBtn">Restaurar demo</button>
+        <div class="search"><input id="search" placeholder="Buscar canal, película, país o categoría"></div>
+      </div>
+      <section class="hero">
+        <div>
+          <div class="ey">MOGA TV FUNCIONAL</div>
+          <h1>TV y películas listas para probar</h1>
+          <p>Sin relleno: canales con URL, películas demo legales, listas M3U separadas y reproducción con proxy local de XAMPP.</p>
+        </div>
+      </section>
+      <section class="content">
+        <div class="notice">Si un canal externo no abre, puede estar caído, geobloqueado o entregar un formato que el navegador no reproduce. Las películas demo sí deben servir para probar el reproductor.</div>
+        <div class="title"><div><h2 id="viewTitle">Fuentes</h2><div class="muted" id="viewMeta"></div></div></div>
+        <div id="sources" class="sources"></div>
+        <div id="filters" class="filters"></div>
+        <div id="grid" class="grid"></div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="importDialog">
+    <form class="modal" method="dialog">
+      <h2>Agregar lista</h2>
+      <p class="muted">Compatible con URL M3U y servidores Xtream/Magma autorizados.</p>
+      <div class="filters">
+        <button type="button" class="tab active" data-mode="xtream">Xtream / Magma</button>
+        <button type="button" class="tab" data-mode="m3u">URL M3U</button>
+      </div>
+      <div id="xtreamFields">
+        <div class="field"><label>Servidor</label><input id="xServer" placeholder="servidor.com:puerto"></div>
+        <div class="row">
+          <div class="field"><label>Usuario</label><input id="xUser" autocomplete="off"></div>
+          <div class="field"><label>Contraseña</label><input id="xPass" autocomplete="off"></div>
+        </div>
+        <div class="field"><label>Nombre</label><input id="xName" placeholder="Mi servidor"></div>
+      </div>
+      <div id="m3uFields" style="display:none">
+        <div class="field"><label>URL completa M3U</label><input id="m3uUrl" placeholder="http://servidor.com/get.php?..."></div>
+        <div class="field"><label>Nombre</label><input id="m3uName" placeholder="Mi lista"></div>
+      </div>
+      <div class="actions">
+        <button class="btn ghost" value="cancel">Cancelar</button>
+        <button class="btn primary" type="button" id="loadBtn">Cargar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="player" id="player">
+    <div class="playerBox">
+      <div class="playerHead"><strong id="playTitle">Reproductor</strong><button class="iconbtn" id="closePlayer">Cerrar</button></div>
+      <div class="videoWrap"><video id="video" controls playsinline></video></div>
+      <div class="status" id="status">Listo.</div>
+      <div class="playerControls"><button class="btn" id="openRaw">Abrir URL original</button><span class="muted">HLS.js + proxy XAMPP</span></div>
+    </div>
+  </div>
+
+  <script>
+    const STORE="moga_tv_functional_v1";
+    const builtinSources=[
+      {id:"builtin-tv",name:"TV gratis mundial",type:"Canales",channels:[
+        ch("fr24es","France 24 Español","F24","Noticias","Francia","https://static.france24.com/live/F24_ES_HI_HLS/live_web.m3u8"),
+        ch("fr24en","France 24 English","F24","Noticias","Francia","https://static.france24.com/live/F24_EN_HI_HLS/live_web.m3u8"),
+        ch("dwes","DW Español","DW","Noticias","Alemania","https://dwamdstream102.akamaized.net/hls/live/2015530/dwstream102/index.m3u8"),
+        ch("dwen","DW English","DW","Noticias","Alemania","https://dwamdstream104.akamaized.net/hls/live/2015531/dwstream104/index.m3u8"),
+        ch("nhk","NHK World Japan","NHK","Noticias","Japón","https://nhkwlive-ojp.akamaized.net/hls/live/2003459/nhkwlive-ojp-en/index.m3u8"),
+        ch("pbs","PBS Kids","PBS","Infantil","USA","https://pbskids-id3.akamaized.net/hls/live/696662/PBSKIDS/master.m3u8")
+      ]},
+      {id:"builtin-movies",name:"Películas demo legales",type:"Películas",channels:[
+        ch("bbb","Big Buck Bunny","BBB","Películas","Demo","https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",false),
+        ch("sintel","Sintel","SIN","Películas","Demo","https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8",false),
+        ch("tears","Tears of Steel","TOS","Películas","Demo","https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8",false)
+      ]}
+    ];
+    let state=loadState(), activeSource=state.sources[0]?.id, activeCategory="Todos", query="", hls=null, rawUrl="";
+
+    function ch(id,name,icon,category,country,stream,live=true){return{id,name,icon,category,country,stream,live,color:pickColor(name)}}
+    function pickColor(seed){const colors=["#f43f5e","#38bdf8","#34d399","#f59e0b","#a78bfa"];return colors[[...seed].reduce((a,c)=>a+c.charCodeAt(0),0)%colors.length]}
+    function loadState(){try{const saved=JSON.parse(localStorage.getItem(STORE)||"null");if(saved?.sources?.length)return ensureBuiltins(saved)}catch{}return ensureBuiltins({sources:[]})}
+    function ensureBuiltins(saved){const map=new Map(saved.sources.map(s=>[s.id,s]));builtinSources.forEach(src=>map.set(src.id,src));saved.sources=[...map.values()];save(saved);return saved}
+    function save(next=state){localStorage.setItem(STORE,JSON.stringify(next))}
+
+    function render(){
+      renderNav();renderSources();renderGrid();
+    }
+    function renderNav(){
+      sourceNav.innerHTML=state.sources.map(src=>`<button class="${src.id===activeSource?'active':''}" data-src="${src.id}"><span>${src.name}</span><small>${src.channels.length}</small></button>`).join("");
+      sourceNav.querySelectorAll("button").forEach(btn=>btn.onclick=()=>{activeSource=btn.dataset.src;activeCategory="Todos";render()});
+    }
+    function renderSources(){
+      sources.innerHTML=state.sources.map(src=>`<button class="source" data-src="${src.id}"><div class="badge">${src.type||"M3U"}</div><strong>${src.name}</strong><span>${src.channels.length} items · ${new Set(src.channels.map(c=>c.category)).size} categorías</span></button>`).join("");
+      sources.querySelectorAll(".source").forEach(btn=>btn.onclick=()=>{activeSource=btn.dataset.src;activeCategory="Todos";render()});
+    }
+    function renderGrid(){
+      const src=state.sources.find(s=>s.id===activeSource)||state.sources[0];
+      viewTitle.textContent=src?src.name:"Fuentes";
+      const all=src?src.channels.filter(c=>c.stream):[];
+      const categories=["Todos",...new Set(all.map(c=>c.category||"Sin categoría"))];
+      filters.innerHTML=categories.map(cat=>`<button class="tab ${cat===activeCategory?'active':''}" data-cat="${cat}">${cat}</button>`).join("");
+      filters.querySelectorAll("button").forEach(btn=>btn.onclick=()=>{activeCategory=btn.dataset.cat;renderGrid()});
+      const q=normalize(query);
+      const visible=all.filter(c=>(activeCategory==="Todos"||c.category===activeCategory)&&(!q||normalize(`${c.name} ${c.category} ${c.country}`).includes(q)));
+      viewMeta.textContent=`${visible.length} visibles de ${all.length} items`;
+      grid.innerHTML=visible.length?visible.map(cardHtml).join(""):`<div class="empty">No hay contenido con stream real en esta vista.</div>`;
+      grid.querySelectorAll(".card").forEach(card=>card.onclick=()=>play(visible.find(c=>c.id===card.dataset.id)));
+    }
+    function cardHtml(c){return`<button class="card" data-id="${c.id}"><span class="badge">${c.live?'EN VIVO':'VOD'}</span><div class="logoBox" style="color:${c.color}">${c.logo?`<img src="${c.logo}">`:c.icon}</div><h3>${c.name}</h3><div class="muted">${c.category} · ${c.country}</div></button>`}
+    function normalize(v){return String(v||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"")}
+
+    addBtn.onclick=()=>importDialog.showModal();
+    resetBtn.onclick=()=>{localStorage.removeItem(STORE);state=loadState();activeSource=state.sources[0].id;activeCategory="Todos";render()};
+    search.oninput=e=>{query=e.target.value;renderGrid()};
+    document.querySelectorAll("[data-mode]").forEach(btn=>btn.onclick=()=>{document.querySelectorAll("[data-mode]").forEach(b=>b.classList.toggle("active",b===btn));xtreamFields.style.display=btn.dataset.mode==="xtream"?"block":"none";m3uFields.style.display=btn.dataset.mode==="m3u"?"block":"none"});
+    loadBtn.onclick=importSource;
+
+    async function importSource(){
+      const mode=document.querySelector("[data-mode].active").dataset.mode;
+      let url,name,type;
+      if(mode==="xtream"){
+        const host=xServer.value.trim().replace(/^https?:\/\//,"").replace(/\/$/,""), user=xUser.value.trim(), pass=xPass.value.trim();
+        if(!host||!user||!pass)return alert("Completa servidor, usuario y contraseña.");
+        url=`http://${host}/get.php?username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}&type=m3u_plus&output=m3u8`;
+        name=xName.value.trim()||host;type="Xtream";
+      }else{
+        url=m3uUrl.value.trim();if(!url)return alert("Pega la URL M3U.");
+        name=m3uName.value.trim()||safeHost(url);type="M3U";
+      }
+      loadBtn.disabled=true;loadBtn.textContent="Cargando...";
+      try{
+        const text=await fetchM3U(url);
+        const source=parseM3U(text,url,name,type);
+        if(!source.channels.length)throw new Error("La lista no trajo canales con URL.");
+        state.sources=state.sources.filter(s=>s.name!==source.name).concat(source);
+        save();activeSource=source.id;activeCategory="Todos";importDialog.close();render();
+      }catch(err){alert(err.message||"No se pudo cargar la lista.");}
+      finally{loadBtn.disabled=false;loadBtn.textContent="Cargar";}
+    }
+    async function fetchM3U(url){
+      const res=await fetch(`./api/fetch_playlist.php?url=${encodeURIComponent(url)}`);
+      if(res.ok){const json=await res.json();if(json.ok&&json.body)return json.body}
+      const direct=await fetch(url);if(!direct.ok)throw new Error("La fuente no respondió.");return direct.text();
+    }
+    function parseM3U(text,url,name,type){
+      const source={id:`src_${Date.now().toString(36)}`,name,type,channels:[]};let current=null;
+      text.split(/\r?\n/).forEach(line=>{line=line.trim();if(!line)return;
+        if(line.startsWith("#EXTINF")){current={name:(line.split(",").slice(1).join(",").trim()||"Canal"),logo:attr(line,"tvg-logo"),category:attr(line,"group-title")||"Sin categoría",country:attr(line,"tvg-country")||"IPTV"}}
+        else if(!line.startsWith("#")&&current){const stream=resolveUrl(url,line);source.channels.push({...current,id:`${source.id}_${source.channels.length}`,stream,icon:(current.name||"CH").slice(0,4).toUpperCase(),color:pickColor(current.name),live:true});current=null}
+      });return source;
+    }
+    function attr(line,name){const m=line.match(new RegExp(`${name}="([^"]*)"`,"i"));return m?m[1]:""}
+    function resolveUrl(base,path){if(/^https?:\/\//i.test(path))return path;try{return new URL(path,base).toString()}catch{return path}}
+    function safeHost(value){try{return new URL(value.startsWith("http")?value:"http://"+value).host}catch{return value}}
+
+    function play(item){
+      if(!item?.stream)return;
+      player.classList.add("on");playTitle.textContent=item.name;rawUrl=item.stream;openRaw.onclick=()=>window.open(rawUrl,"_blank");
+      const urls=playbackUrls(item);tryPlay(urls,0);
+    }
+    function playbackUrls(item){const out=[item.stream];if(item.stream.includes("/live/")){out.push(item.stream.replace(/\.m3u8($|\?)/,".ts$1"));out.push(item.stream.replace(/\.m3u8($|\?)/,"$1"))}return [...new Set(out)]}
+    function proxy(url){return`./api/stream.php?url=${encodeURIComponent(url)}`}
+    function tryPlay(urls,index){
+      if(hls){hls.destroy();hls=null}video.removeAttribute("src");video.load();
+      if(index>=urls.length){status.textContent="No se pudo reproducir. Puede estar caído, geobloqueado o ser .ts no compatible con navegador.";status.className="status error";return}
+      const original=urls[index], src=proxy(original);status.textContent=`Probando ${index+1}/${urls.length}: ${original}`;status.className="status";
+      if(window.Hls?.isSupported()){hls=new Hls({enableWorker:true,lowLatencyMode:true});hls.loadSource(src);hls.attachMedia(video);hls.on(Hls.Events.MANIFEST_PARSED,()=>{status.textContent="Reproduciendo.";video.play().catch(()=>{})});hls.on(Hls.Events.ERROR,(_,data)=>{if(data.fatal)tryPlay(urls,index+1)})}
+      else{video.src=src;video.oncanplay=()=>{status.textContent="Reproduciendo.";video.play().catch(()=>{})};video.onerror=()=>tryPlay(urls,index+1)}
+    }
+    closePlayer.onclick=()=>{player.classList.remove("on");if(hls){hls.destroy();hls=null}video.pause();video.removeAttribute("src");video.load()};
+    player.onclick=e=>{if(e.target===player)closePlayer.click()};
+    if("serviceWorker" in navigator){navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister()));if(window.caches)caches.keys().then(keys=>keys.forEach(k=>caches.delete(k)))}
+    render();
+  </script>
+</body>
+</html>

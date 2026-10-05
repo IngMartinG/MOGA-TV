@@ -1,0 +1,50 @@
+╔══════════════════════════════════════════════════════╗
+║              MOGA TV — INSTRUCCIONES                 ║
+╚══════════════════════════════════════════════════════╝
+
+REQUISITOS:
+  • Node.js instalado (descargar en https://nodejs.org)
+    Elige la versión LTS (recomendada)
+
+CÓMO USAR:
+
+  1. Descarga esta carpeta MOGATV completa
+
+  2. Abre la carpeta MOGATV
+
+  3. Abre una terminal (símbolo del sistema / PowerShell)
+     en esa carpeta y escribe:
+
+         node server.js
+
+  4. Verás este mensaje:
+     ╔══════════════════════════════════════╗
+     ║  Abre en tu navegador:              ║
+     ║  http://localhost:3000              ║
+     ╚══════════════════════════════════════╝
+
+  5. Abre tu navegador y ve a:
+         http://localhost:3000
+
+  6. ¡Listo! MOGA TV estará funcionando con:
+     ✅ Canales gratuitos reales en vivo
+     ✅ Soporte para listas M3U (Magma, Xuper, etc.)
+
+AGREGAR TU LISTA MAGMA:
+  • Menú de perfil → "Agregar lista M3U"
+  • Pestaña "Xtream / Magma"
+  • Servidor: tv.m3uts.xyz
+  • Usuario: m
+  • Contraseña: m
+  • Clic en "Cargar canales"
+
+¿POR QUÉ NODE.JS?
+  Tu lista usa HTTP (sin S). Los navegadores bloquean
+  HTTP desde páginas normales. El server.js actúa como
+  puente seguro entre el navegador y el servidor IPTV.
+  Sin antivirus que lo bloquee, sin servicios externos.
+
+PARA PUBLICAR EN INTERNET (próximo paso):
+  Sube a Vercel + configura Supabase.
+  Dile a Claude y te guía paso a paso.
+
