@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#07090e">
+  <meta name="description" content="MOGA TV: TV en vivo, películas y tus listas IPTV en un solo lugar.">
+  <title>MOGA TV</title>
+  <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <script defer src="/vendor/hls.min.js"></script>
+  <script defer src="/vendor/mpegts.js"></script>
+  <script type="module" src="/js/main.js"></script>
+</head>
+<body>
+  <div id="boot" class="boot" aria-live="polite">
+    <div class="brand brand--big">MOGA<span>TV</span></div>
+    <div class="spinner" aria-hidden="true"></div>
+  </div>
+
+  <!-- Pantalla de acceso -->
+  <section id="auth" class="auth" hidden>
+    <div class="auth__panel">
+      <div class="brand brand--big">MOGA<span>TV</span></div>
+      <p class="muted">TV en vivo, películas y tus listas en un solo lugar.</p>
+      <div class="tabs" role="tablist">
+        <button class="tab is-active" type="button" role="tab" data-auth-tab="login">Iniciar sesión</button>
+        <button class="tab" type="button" role="tab" data-auth-tab="register">Crear cuenta</button>
+      </div>
+      <form id="login-form" class="form" novalidate>
+        <label>Correo<input name="email" type="email" autocomplete="email" required maxlength="254"></label>
+        <label>Contraseña<input name="password" type="password" autocomplete="current-password" required maxlength="128"></label>
+        <button class="btn btn--primary btn--block" type="submit">Entrar</button>
+      </form>
+      <form id="register-form" class="form" novalidate hidden>
+        <label>Nombre<input name="name" type="text" autocomplete="name" required minlength="2" maxlength="60"></label>
+        <label>Correo<input name="email" type="email" autocomplete="email" required maxlength="254"></label>
+        <label>Contraseña<input name="password" type="password" autocomplete="new-password" required minlength="10" maxlength="128"></label>
+        <p class="hint">Mínimo 10 caracteres, con letras y números.</p>
+        <button class="btn btn--primary btn--block" type="submit">Crear cuenta</button>
+      </form>
+      <p class="form-error" id="auth-error" role="alert"></p>
+    </div>
+  </section>
+
+  <!-- Aplicación -->
+  <div id="app" class="shell" hidden>
+    <aside class="sidebar">
+      <a class="brand" href="#/">MOGA<span>TV</span></a>
+      <nav class="nav" aria-label="Principal">
+        <a href="#/" data-nav="home"><span class="ico" aria-hidden="true">⌂</span>Inicio</a>
+        <a href="#/tv" data-nav="tv"><span class="ico" aria-hidden="true">◉</span>TV en vivo</a>
+        <a href="#/peliculas" data-nav="peliculas"><span class="ico" aria-hidden="true">▶</span>Películas</a>
+        <a href="#/listas" data-nav="listas"><span class="ico" aria-hidden="true">☰</span>Mis listas</a>
+        <a href="#/favoritos" data-nav="favoritos"><span class="ico" aria-hidden="true">★</span>Favoritos</a>
+        <a href="#/cuenta" data-nav="cuenta"><span class="ico" aria-hidden="true">●</span>Mi cuenta</a>
+      </nav>
+      <div class="sidebar__user">
+        <span class="avatar" id="user-avatar"></span>
+        <div><strong id="user-name"></strong><small id="user-email" class="muted"></small></div>
+      </div>
+    </aside>
+    <main id="view" class="view" tabindex="-1"></main>
+  </div>
+
+  <!-- Reproductor -->
+  <div id="player" class="player" role="dialog" aria-modal="true" aria-labelledby="player-title" hidden>
+    <div class="player__box">
+      <header class="player__head">
+        <div>
+          <h2 id="player-title"></h2>
+          <small id="player-subtitle" class="muted"></small>
+        </div>
+        <div class="player__actions">
+          <button class="btn" type="button" id="player-fav">☆ Favorito</button>
+          <button class="btn" type="button" id="player-close" aria-label="Cerrar reproductor">✕</button>
+        </div>
+      </header>
+      <div class="player__video">
+        <video id="player-video" controls playsinline></video>
+        <div class="player__overlay" id="player-overlay">
+          <div class="spinner" aria-hidden="true"></div>
+          <p id="player-status">Conectando…</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+</body>
+</html>
