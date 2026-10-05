@@ -1,4 +1,7 @@
 import http from 'node:http';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { loadConfig } from '../src/config/env.js';
 import { createApp } from '../src/app.js';
 import { createLogger } from '../src/infrastructure/logger.js';
@@ -13,6 +16,8 @@ export function listen(server) {
 export async function startApp(overrides = {}) {
   const config = loadConfig({
     DB_PATH: ':memory:',
+    DATA_DIR: mkdtempSync(join(tmpdir(), 'moga-test-')),
+    HEALTH_WARMUP: 'false',
     APP_SECRET: 'test-secret-test-secret-test-secret-1234',
     ALLOW_PRIVATE_NETWORKS: 'true',
     ...overrides,
@@ -96,6 +101,61 @@ export async function startFakeIptv() {
         res.setHeader('content-type', 'video/mp2t');
         return res.end(Buffer.from('STRICT-TS'));
       }
+    }
+    // Mini API iptv-org
+    if (url.pathname.startsWith('/api/')) {
+      const api = {
+        'channels.json': [
+          { id: 'Bueno.co', name: 'Canal Bueno', country: 'CO', categories: ['news'], is_nsfw: false, closed: null },
+          { id: 'Caido.co', name: 'Canal Caído', country: 'CO', categories: ['sports'], is_nsfw: false, closed: null },
+          { id: 'Referer.co', name: 'Canal Con Referer', country: 'CO', categories: ['sports'], is_nsfw: false, closed: null },
+          { id: 'Adultos.co', name: 'Adultos', country: 'CO', categories: ['xxx'], is_nsfw: true, closed: null },
+          { id: 'Bloqueado.co', name: 'Bloqueado', country: 'CO', categories: ['news'], is_nsfw: false, closed: null },
+          { id: 'Cerrado.co', name: 'Cerrado', country: 'CO', categories: ['news'], is_nsfw: false, closed: '2020-01-01' },
+        ],
+        'streams.json': [
+          { channel: 'Bueno.co', feed: null, url: `${base}/pub/bueno/index.m3u8`, referrer: null, user_agent: null, quality: '720p' },
+          { channel: 'Caido.co', feed: null, url: `${base}/pub/caido/index.m3u8`, referrer: null, user_agent: null, quality: null },
+          { channel: 'Referer.co', feed: null, url: `${base}/pub/ref/index.m3u8`, referrer: 'https://canal.example/', user_agent: 'MiAgente/1.0', quality: '1080p' },
+          { channel: 'Adultos.co', feed: null, url: `${base}/pub/x.m3u8`, referrer: null, user_agent: null, quality: null },
+          { channel: 'Bloqueado.co', feed: null, url: `${base}/pub/b.m3u8`, referrer: null, user_agent: null, quality: null },
+          { channel: 'Cerrado.co', feed: null, url: `${base}/pub/c.m3u8`, referrer: null, user_agent: null, quality: null },
+          { channel: null, feed: null, url: `${base}/pub/sin-canal.m3u8`, referrer: null, user_agent: null, quality: null },
+        ],
+        'logos.json': [
+          { channel: 'Bueno.co', feed: null, in_use: true, url: 'https://logo.example/bueno.png' },
+          { channel: 'Referer.co', feed: null, in_use: true, url: 'javascript:alert(1)' },
+        ],
+        'blocklist.json': [{ channel: 'Bloqueado.co', reason: 'dmca' }],
+      }[url.pathname.slice(5)];
+      if (!api) {
+        res.statusCode = 404;
+        return res.end();
+      }
+      res.setHeader('content-type', 'application/json');
+      return res.end(JSON.stringify(api));
+    }
+    if (url.pathname.startsWith('/pub/')) {
+      if (url.pathname.startsWith('/pub/caido/')) {
+        res.statusCode = 404;
+        return res.end();
+      }
+      if (url.pathname.startsWith('/pub/ref/')) {
+        const okHeaders =
+          req.headers.referer === 'https://canal.example/' &&
+          req.headers.origin === 'https://canal.example' &&
+          req.headers['user-agent'] === 'MiAgente/1.0';
+        if (!okHeaders) {
+          res.statusCode = 403;
+          return res.end();
+        }
+      }
+      if (url.pathname.endsWith('.m3u8')) {
+        res.setHeader('content-type', 'application/vnd.apple.mpegurl');
+        return res.end('#EXTM3U\n#EXTINF:4,\nseg0.ts\n');
+      }
+      res.setHeader('content-type', 'video/mp2t');
+      return res.end(Buffer.from('PUB-TS'));
     }
     if (url.pathname === '/list.m3u') {
       res.setHeader('content-type', 'audio/x-mpegurl');

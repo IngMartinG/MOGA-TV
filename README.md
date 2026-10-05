@@ -61,6 +61,14 @@ Flujo de una petición: **ruta → controlador → servicio → repositorio → 
 
 ---
 
+## De dónde salen los canales
+
+- **API abierta de [iptv-org](https://github.com/iptv-org/api)**: miles de canales de acceso libre publicados por sus propios emisores, por país y por categoría. La app descarga el índice (canales, streams, logos, lista de bloqueo) cada 12 horas y lo guarda en `data/cache/` para arrancar rápido aunque la API no responda.
+- **Verificación automática**: el servidor prueba cada canal (lista HLS y primer segmento) con las cabeceras que exige (`Referer`, `User-Agent`) y guarda el resultado. En pantalla salen primero los **✓ Verificados**; los caídos se ocultan. Cada vez que alguien abre un canal, ese resultado también cuenta.
+- **Tus listas** (M3U o Xtream) en *Mis listas*.
+
+La primera vez que arranca tarda unos segundos en descargar el índice y empieza a verificar Colombia, Deportes y Noticias; en las demás listas, la verificación empieza al abrirlas y la pantalla se actualiza sola.
+
 ## Seguridad
 
 | Riesgo | Cómo se protege |
@@ -102,7 +110,7 @@ En producción es obligatorio: **HTTPS** (Caddy, Nginx + Let's Encrypt, o el del
 
 - **Códecs**: el navegador reproduce H.264/AAC (y VP9). Canales en **HEVC/H.265** o con audio **AC3** pueden no verse en el navegador (sí en VLC). No se puede arreglar sin recodificar en el servidor.
 - **DRM**: Netflix, DAZN, Win Sports+, etc. usan DRM; ninguna app web puede reproducirlos sin licencia oficial.
-- **Canales gratuitos**: sus URLs cambian con el tiempo y algunos se bloquean según el país.
+- **Canales gratuitos**: sus URLs cambian con el tiempo y algunos se bloquean según el país; la verificación automática los esconde cuando dejan de responder.
 - **Ancho de banda**: todo el video pasa por tu servidor (por seguridad). Cada espectador consume en el servidor lo mismo que en su casa (~2–8 Mbps en HD).
 - **Series de Xtream**: todavía no se importan (solo TV en vivo y películas).
 

@@ -76,5 +76,9 @@ export function loadConfig(overrides = {}) {
     maxPlaylistBytes: int(env.MAX_PLAYLIST_MB, 60) * 1024 * 1024,
     maxPlaylistsPerUser: int(env.MAX_PLAYLISTS_PER_USER, 10),
     upstreamTimeoutMs: int(env.UPSTREAM_TIMEOUT_MS, 20000),
+    // API abierta de iptv-org (canales, streams, logos). Configurable para pruebas.
+    iptvorgApiBase: (env.IPTVORG_API_BASE || 'https://iptv-org.github.io/api').replace(/\/$/, ''),
+    // Verificación de canales en segundo plano al arrancar (se desactiva en pruebas).
+    healthWarmup: bool(env.HEALTH_WARMUP, true),
   });
 }

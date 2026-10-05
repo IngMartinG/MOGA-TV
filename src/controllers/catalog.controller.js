@@ -1,6 +1,19 @@
-import { itemKeySchema, publicListSchema } from '../validators/schemas.js';
+import { itemKeySchema, playResultSchema, publicListSchema, publicQuerySchema } from '../validators/schemas.js';
 
-export function createCatalogController({ catalogService, playlistService, streamService }) {
+const REPORT_WINDOW_MS = 30 * 60 * 1000;
+
+export function createCatalogController({ catalogService, playlistService, streamService, streamHealth }) {
+  // Canales públicos que cada usuario abrió hace poco: solo de esos acepta reportes.
+  const recentPlays = new Map(); // `${userId}:${streamId}` -> { stream, until }
+
+  function rememberPlay(userId, stream) {
+    const now = Date.now();
+    if (recentPlays.size > 5000) {
+      for (const [k, v] of recentPlays) if (v.until < now) recentPlays.delete(k);
+    }
+    recentPlays.set(`${userId}:${stream.id}`, { stream, until: now + REPORT_WINDOW_MS });
+  }
+
   return {
     home(_req, res) {
       res.json({
@@ -13,7 +26,8 @@ export function createCatalogController({ catalogService, playlistService, strea
 
     async publicChannels(req, res) {
       const { kind, code } = publicListSchema.parse(req.params);
-      res.json({ items: await catalogService.publicChannels(kind, code) });
+      const { todos } = publicQuerySchema.parse(req.query);
+      res.json(await catalogService.publicChannels(kind, code, { includeDead: todos }));
     },
 
     /** Entrega la URL tokenizada para reproducir cualquier contenido por su clave. */
@@ -23,7 +37,28 @@ export function createCatalogController({ catalogService, playlistService, strea
         return res.json(playlistService.playChannel(req.user.id, Number(key.slice(3))));
       }
       const item = await catalogService.resolveKey(key);
-      res.json({ ...streamService.playbackFor(req.user.id, item.url), title: item.title, live: item.live });
+      if (item.stream) rememberPlay(req.user.id, item.stream);
+      res.json({
+        ...streamService.playbackFor(req.user.id, item.url, item.headers),
+        title: item.title,
+        live: item.live,
+      });
+    },
+
+    /**
+     * El reproductor informa si un canal público arrancó o no. Si arrancó, queda
+     * verificado; si falló, el servidor lo vuelve a probar (puede ser un códec que
+     * solo ese navegador no soporta, y no por eso el canal está caído).
+     */
+    playResult(req, res) {
+      const key = itemKeySchema.parse(req.params.key);
+      const { ok } = playResultSchema.parse(req.body);
+      const recent = key.startsWith('pub:') ? recentPlays.get(`${req.user.id}:${key.slice(4)}`) : null;
+      if (recent && recent.until > Date.now()) {
+        if (ok) streamHealth.markOk(recent.stream.id);
+        else streamHealth.enqueue([recent.stream], { priority: true });
+      }
+      res.status(204).end();
     },
   };
 }

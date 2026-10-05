@@ -13,6 +13,8 @@
 import { createHttpClient, USER_AGENTS } from '../src/infrastructure/http-client.js';
 import { loadXtreamAccount } from '../src/services/xtream.client.js';
 import { FREE_CHANNELS } from '../src/data/catalog.js';
+import { buildIndex } from '../src/services/iptvorg.service.js';
+import { sourceHeaders } from '../src/services/stream.service.js';
 
 const client = createHttpClient({ timeoutMs: 15000 });
 const [server, username, password] = process.argv.slice(2);
@@ -33,7 +35,7 @@ function line(ok, label, detail = '') {
 async function probeStream(label, url, userAgent) {
   const started = Date.now();
   try {
-    const headers = userAgent ? { 'user-agent': userAgent } : {};
+    const headers = typeof userAgent === 'object' ? userAgent : userAgent ? { 'user-agent': userAgent } : {};
     const res = await client.request(url, { headers });
     const type = String(res.headers['content-type'] || '?');
     const ms = Date.now() - started;
@@ -70,12 +72,23 @@ async function probeStream(label, url, userAgent) {
 
 console.log('\nMOGA TV · diagnóstico\n');
 
-console.log('1) Listas públicas');
+console.log('1) API de iptv-org');
+let colombia = [];
 try {
-  const { text } = await client.getText('https://iptv-org.github.io/iptv/countries/co.m3u', { maxBytes: 5 * 1024 * 1024 });
-  line(true, 'iptv-org (Colombia)', `${(text.match(/#EXTINF/g) || []).length} canales`);
+  const base = 'https://iptv-org.github.io/api';
+  const big = { maxBytes: 80 * 1024 * 1024 };
+  const [channels, streams, logos, blocklist] = await Promise.all(
+    ['channels', 'streams', 'logos', 'blocklist'].map((f) => client.getJson(`${base}/${f}.json`, big)),
+  );
+  const index = buildIndex({ channels, streams, logos, blocklist });
+  colombia = index.streams.filter((s) => s.country === 'CO');
+  line(true, 'API iptv-org', `${channels.length} canales, ${index.streams.length} streams utilizables, ${colombia.length} de Colombia`);
 } catch (err) {
-  line(false, 'iptv-org (Colombia)', err.message);
+  line(false, 'API iptv-org', err.message);
+}
+for (const s of colombia.slice(0, 5)) {
+  const extra = [s.referrer && 'Referer', s.userAgent && 'User-Agent'].filter(Boolean).join(' + ');
+  await probeStream(`${s.name}${extra ? ` (con ${extra})` : ''}`, s.url, sourceHeaders(s));
 }
 
 console.log('\n2) Canales gratuitos');

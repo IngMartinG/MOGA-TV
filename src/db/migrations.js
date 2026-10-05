@@ -63,6 +63,14 @@ const MIGRATIONS = [
     PRIMARY KEY (user_id, item_key)
   );
   `,
+  `
+  CREATE TABLE stream_health (
+    stream_id   TEXT PRIMARY KEY,
+    ok          INTEGER NOT NULL,
+    reason      TEXT,
+    checked_at  INTEGER NOT NULL
+  );
+  `,
 ];
 
 export function migrate(db) {
