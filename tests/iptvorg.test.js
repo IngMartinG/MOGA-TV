@@ -134,6 +134,12 @@ describe('Películas de Internet Archive', () => {
     assert.equal((await c.get('/api/movies/archive/noexiste')).status, 404);
   });
 
+  test('si advancedsearch falla, usa la API scrape de respaldo', async () => {
+    const res = await c.get('/api/movies/archive/western');
+    assert.equal(res.status, 200, JSON.stringify(res.data));
+    assert.deepEqual(res.data.items.map((m) => m.name), ['Western de Respaldo']);
+  });
+
   test('reproduce el mejor MP4 (no el tráiler) con soporte de saltos (Range)', async () => {
     const play = await c.get('/api/play/ia:NightOfTheLivingDead');
     assert.equal(play.status, 200, JSON.stringify(play.data));

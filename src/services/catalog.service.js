@@ -1,5 +1,6 @@
 import { FREE_CHANNELS, FREE_MOVIES, PUBLIC_CATEGORIES, PUBLIC_COUNTRIES } from '../data/catalog.js';
 import { notFound } from '../utils/errors.js';
+import { USER_AGENTS } from '../infrastructure/http-client.js';
 
 const CATEGORY_NAMES = new Map([
   ...PUBLIC_CATEGORIES.map((c) => [c.code, c.name]),
@@ -85,7 +86,14 @@ export function createCatalogService({ iptvorg, streamHealth, archive }) {
     }
     if (kind === 'ia') {
       const movie = await archive.resolve(id);
-      return { url: movie.url, title: movie.title, logo: movie.logo, subtitle: movie.year ? `Película · ${movie.year}` : 'Película', live: false };
+      return {
+        url: movie.url,
+        title: movie.title,
+        logo: movie.logo,
+        subtitle: movie.year ? `Película · ${movie.year}` : 'Película',
+        live: false,
+        headers: { userAgent: USER_AGENTS.browser },
+      };
     }
     if (kind === 'pub') {
       const stream = await iptvorg.get(id);

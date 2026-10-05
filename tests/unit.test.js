@@ -6,6 +6,7 @@ import { isPrivateAddress, parseExternalUrl } from '../src/security/ssrf.js';
 import { createSealer } from '../src/security/crypto.js';
 import { hashPassword, verifyPassword } from '../src/security/password.js';
 import { itemKeySchema } from '../src/validators/schemas.js';
+import { createHttpClient, mapUpstreamError } from '../src/infrastructure/http-client.js';
 
 test('parseM3U lee nombre, grupo, logo y tipo', () => {
   const list = parseM3U(
@@ -84,4 +85,13 @@ test('claves de contenido válidas e inválidas', () => {
   for (const key of ['public:pais:co:1', 'pub:XYZ', 'pub:0123', '<script>', 'ch:abc']) {
     assert.equal(itemKeySchema.safeParse(key).success, false, key);
   }
+});
+
+test('los errores de conexión muestran el código técnico', async () => {
+  assert.match(mapUpstreamError(Object.assign(new Error('x'), { code: 'EFOO' })).message, /\(EFOO\)/);
+  assert.match(mapUpstreamError(Object.assign(new Error('x'), { code: 'ENETUNREACH' })).message, /Sin ruta de red.*ENETUNREACH/);
+  assert.match(mapUpstreamError(Object.assign(new Error('x'), { code: 'UNABLE_TO_GET_ISSUER_CERT_LOCALLY' })).message, /antivirus/);
+  const client = createHttpClient({ allowPrivateNetworks: true, timeoutMs: 3000 });
+  await assert.rejects(client.getText('http://127.0.0.1:9/'), (err) => /ECONNREFUSED/.test(err.message) && err.network === true);
+  client.close();
 });

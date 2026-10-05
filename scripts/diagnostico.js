@@ -91,11 +91,30 @@ for (const s of colombia.slice(0, 5)) {
   await probeStream(`${s.name}${extra ? ` (con ${extra})` : ''}`, s.url, sourceHeaders(s));
 }
 
-console.log('\n2) Canales gratuitos');
+console.log('\n2) Internet Archive (películas)');
+try {
+  const browser = { 'user-agent': USER_AGENTS.browser };
+  const search = await client.getJson(
+    'https://archive.org/advancedsearch.php?q=collection%3Afeature_films&fl%5B%5D=identifier&rows=1&output=json',
+    { headers: browser },
+  );
+  const id = search?.response?.docs?.[0]?.identifier;
+  line(Boolean(id), 'Búsqueda', id ? `ok (${id})` : 'sin resultados');
+  if (id) {
+    const meta = await client.getJson(`https://archive.org/metadata/${encodeURIComponent(id)}`, { headers: browser, maxBytes: 20 * 1024 * 1024 });
+    const file = (meta.files || []).find((f) => /mpeg4|h\.264/i.test(f.format || ''));
+    if (file) await probeStream('Descarga de video', `https://archive.org/download/${encodeURIComponent(id)}/${encodeURIComponent(file.name)}`, browser);
+    else line(false, 'Descarga de video', 'la película no tiene MP4');
+  }
+} catch (err) {
+  line(false, 'Internet Archive', err.message);
+}
+
+console.log('\n3) Canales gratuitos');
 for (const ch of FREE_CHANNELS.slice(0, 4)) await probeStream(ch.name, ch.url);
 
 if (server && username && password) {
-  console.log('\n3) Cuenta Xtream');
+  console.log('\n4) Cuenta Xtream');
   const base = (/^https?:\/\//i.test(server) ? server : `http://${server}`).replace(/\/+$/, '');
   console.log(`   Servidor: ${host(base)}`);
   try {
@@ -106,7 +125,7 @@ if (server && username && password) {
     );
     const live = entries.filter((e) => e.mediaType === 'live');
     line(true, `Lista cargada por ${via}`, `${live.length} canales, ${entries.length - live.length} películas`);
-    console.log('\n4) Canales de la cuenta');
+    console.log('\n5) Canales de la cuenta');
     for (const e of live.slice(0, 3)) await probeStream(e.name, e.url, userAgent);
     if (live[0] && /\.m3u8$/.test(live[0].url)) {
       await probeStream(`${live[0].name} (formato TS)`, live[0].url.replace(/\.m3u8$/, '.ts'), userAgent);

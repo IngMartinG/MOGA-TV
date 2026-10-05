@@ -175,7 +175,15 @@ export async function renderMovies(view) {
       }
       if (myRequest === state.requestId) draw();
     } catch (err) {
-      if (myRequest === state.requestId) mount(grid, emptyState(`No se pudieron cargar las películas: ${err.message}`));
+      if (myRequest === state.requestId) {
+        mount(
+          grid,
+          emptyState(
+            `No se pudieron cargar las películas: ${err.message}`,
+            h('button', { class: 'btn btn--primary', type: 'button', text: 'Reintentar', onclick: () => load() }),
+          ),
+        );
+      }
     }
   }
 

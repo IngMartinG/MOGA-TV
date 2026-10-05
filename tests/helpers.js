@@ -105,6 +105,14 @@ export async function startFakeIptv() {
     // Mini Internet Archive
     if (url.pathname.startsWith('/archive/')) {
       const path = url.pathname.slice(8);
+      if (path === '/advancedsearch.php' && /western/.test(url.searchParams.get('q') || '')) {
+        res.statusCode = 500;
+        return res.end('error');
+      }
+      if (path === '/services/search/v1/scrape') {
+        res.setHeader('content-type', 'application/json');
+        return res.end(JSON.stringify({ items: [{ identifier: 'WesternRespaldo', title: 'Western de Respaldo', year: '1950' }] }));
+      }
       if (path === '/advancedsearch.php') {
         res.setHeader('content-type', 'application/json');
         return res.end(
